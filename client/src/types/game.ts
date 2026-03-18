@@ -26,6 +26,17 @@ export interface GameRolledPayload {
   dice: number[];
   held: boolean[];
   rollCount: number;
+  preview: Record<string, number>;
+}
+
+export interface GameHeldPayload {
+  held: boolean[];
+  playerId: string;
+}
+
+export interface GameHoveredPayload {
+  category: string | null;
+  playerId: string;
 }
 
 export interface GameScoredPayload {
@@ -47,6 +58,7 @@ export interface GameSyncPayload {
   scores: Record<string, Record<string, number>>;
   currentPlayer: string;
   round: number;
+  preview: Record<string, number>;
 }
 
 export interface RankEntry {
