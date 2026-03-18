@@ -1,8 +1,9 @@
 package game
 
 import (
+	"crypto/rand"
 	"errors"
-	"math/rand"
+	"math/big"
 	"yacht-dice-server/message"
 )
 
@@ -59,7 +60,7 @@ func (e *Engine) Scores() map[string]map[string]int {
 	return out
 }
 
-func (e *Engine) Roll(playerID string, held []int) ([5]int, error) {
+func (e *Engine) Roll(playerID string) ([5]int, error) {
 	if e.finished {
 		return [5]int{}, errors.New("game is finished")
 	}
@@ -69,25 +70,37 @@ func (e *Engine) Roll(playerID string, held []int) ([5]int, error) {
 	if e.rollCount >= 3 {
 		return [5]int{}, errors.New(message.ErrInvalidRoll)
 	}
-	if e.rollCount == 0 && len(held) > 0 {
-		return [5]int{}, errors.New(message.ErrInvalidRoll)
-	}
-
-	e.held = [5]bool{}
-	for _, idx := range held {
-		if idx >= 0 && idx < 5 {
-			e.held[idx] = true
-		}
+	// First roll: reset held (no holding allowed on first roll)
+	if e.rollCount == 0 {
+		e.held = [5]bool{}
 	}
 
 	for i := 0; i < 5; i++ {
 		if !e.held[i] {
-			e.dice[i] = rand.Intn(6) + 1
+			n, _ := rand.Int(rand.Reader, big.NewInt(6))
+			e.dice[i] = int(n.Int64()) + 1
 		}
 	}
 
 	e.rollCount++
 	return e.dice, nil
+}
+
+func (e *Engine) Hold(playerID string, index int) ([5]bool, error) {
+	if e.finished {
+		return [5]bool{}, errors.New("game is finished")
+	}
+	if playerID != e.CurrentPlayer() {
+		return [5]bool{}, errors.New(message.ErrNotYourTurn)
+	}
+	if e.rollCount == 0 {
+		return [5]bool{}, errors.New(message.ErrInvalidRoll)
+	}
+	if index < 0 || index >= 5 {
+		return [5]bool{}, errors.New(message.ErrInvalidIndex)
+	}
+	e.held[index] = !e.held[index]
+	return e.held, nil
 }
 
 func (e *Engine) Score(playerID string, category string) (int, error) {
@@ -159,14 +172,30 @@ func (e *Engine) RemovePlayer(playerID string) {
 	}
 }
 
+func (e *Engine) Preview(playerID string) map[string]int {
+	preview := make(map[string]int)
+	playerScores := e.scores[playerID]
+	if playerScores == nil {
+		return preview
+	}
+	for _, cat := range categories {
+		if _, scored := playerScores[cat]; !scored {
+			preview[cat] = Calculate(e.dice, cat)
+		}
+	}
+	return preview
+}
+
 func (e *Engine) Rankings() []message.RankEntry {
 	type ps struct {
 		id    string
 		score int
 	}
 	var list []ps
-	for pid := range e.scores {
-		list = append(list, ps{pid, TotalScore(e.scores[pid])})
+	for _, pid := range e.playerOrder {
+		if scores, ok := e.scores[pid]; ok {
+			list = append(list, ps{pid, TotalScore(scores)})
+		}
 	}
 	for i := 0; i < len(list); i++ {
 		for j := i + 1; j < len(list); j++ {

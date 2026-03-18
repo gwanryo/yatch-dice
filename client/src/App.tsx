@@ -1,10 +1,11 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState, Component } from 'react';
+import type { ReactNode, ErrorInfo } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useGameState } from './hooks/useGameState';
 import type {
   RoomState, GameRolledPayload, GameScoredPayload,
   GameTurnPayload, GameSyncPayload, GameEndPayload,
-  ReactionShowPayload,
+  ReactionShowPayload, GameHeldPayload, GameHoveredPayload,
 } from './types/game';
 
 const LobbyPage = lazy(() => import('./pages/LobbyPage'));
@@ -18,6 +19,37 @@ function LoadingFallback() {
       <div className="text-white/60 text-lg font-body">Loading…</div>
     </div>
   );
+}
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('ErrorBoundary caught:', error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-gray-950 via-emerald-950 to-gray-950 flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <p className="text-white text-lg">Something went wrong.</p>
+            <button
+              onClick={() => this.setState({ hasError: false })}
+              className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export default function App() {
@@ -53,7 +85,15 @@ export default function App() {
       }),
       ws.on('game:rolled', (env) => {
         const p = env.payload as GameRolledPayload;
-        dispatch({ type: 'GAME_ROLLED', dice: p.dice, held: p.held, rollCount: p.rollCount });
+        dispatch({ type: 'GAME_ROLLED', dice: p.dice, held: p.held, rollCount: p.rollCount, preview: p.preview });
+      }),
+      ws.on('game:held', (env) => {
+        const p = env.payload as GameHeldPayload;
+        dispatch({ type: 'GAME_HELD', held: p.held });
+      }),
+      ws.on('game:hovered', (env) => {
+        const p = env.payload as GameHoveredPayload;
+        dispatch({ type: 'SET_HOVERED', category: p.category, playerId: p.playerId });
       }),
       ws.on('game:scored', (env) => {
         const p = env.payload as GameScoredPayload;
@@ -75,7 +115,10 @@ export default function App() {
         const p = env.payload as ReactionShowPayload;
         dispatch({ type: 'ADD_REACTION', playerId: p.playerId, emoji: p.emoji });
       }),
-      ws.on('player:left', () => {}),
+      ws.on('player:left', (env) => {
+        const p = env.payload as { playerId: string };
+        dispatch({ type: 'SET_PLAYERS', players: state.players.filter(pl => pl.id !== p.playerId) });
+      }),
       ws.on('error', (env) => {
         const p = env.payload as { message: string };
         setError(p.message);
@@ -83,7 +126,7 @@ export default function App() {
       }),
     ];
     return () => unsubs.forEach(u => u());
-  }, [ws, dispatch]);
+  }, [ws, dispatch, state.players]);
 
   const page = (() => {
     switch (state.phase) {
@@ -99,10 +142,21 @@ export default function App() {
   })();
 
   return (
-    <>
-      {!ws.connected && nickname && (
+    <ErrorBoundary>
+      {!ws.connected && nickname && !ws.connectionFailed && (
         <div className="fixed top-0 inset-x-0 z-50 bg-red-600/90 text-white text-center py-2 text-sm font-body" role="alert" aria-live="polite">
           Reconnecting…
+        </div>
+      )}
+      {ws.connectionFailed && (
+        <div className="fixed top-0 inset-x-0 z-50 bg-red-800/90 text-white text-center py-2 text-sm font-body flex items-center justify-center gap-3" role="alert" aria-live="polite">
+          <span>Connection lost.</span>
+          <button
+            onClick={ws.reconnect}
+            className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm transition-colors"
+          >
+            Retry
+          </button>
         </div>
       )}
       {error && (
@@ -113,6 +167,6 @@ export default function App() {
       <Suspense fallback={<LoadingFallback />}>
         {page}
       </Suspense>
-    </>
+    </ErrorBoundary>
   );
 }
