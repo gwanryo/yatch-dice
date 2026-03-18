@@ -16,7 +16,9 @@ export interface GameState {
   round: number;
   scores: Record<string, Record<string, number>>;
   rankings: RankEntry[];
-  reactions: { playerId: string; emoji: string; ts: number }[];
+  reactions: { playerId: string; emoji: string; id: string }[];
+  preview: Record<string, number>;
+  hoveredCategory: { category: string | null; playerId: string } | null;
 }
 
 export type GameAction =
@@ -25,14 +27,15 @@ export type GameAction =
   | { type: 'SET_ROOM'; roomCode: string }
   | { type: 'SET_PLAYERS'; players: PlayerInfo[] }
   | { type: 'SET_ROOM_LIST'; list: RoomListItem[] }
-  | { type: 'GAME_ROLLED'; dice: number[]; held: boolean[]; rollCount: number }
-  | { type: 'TOGGLE_HOLD'; index: number }
+  | { type: 'GAME_ROLLED'; dice: number[]; held: boolean[]; rollCount: number; preview: Record<string, number> }
+  | { type: 'GAME_HELD'; held: boolean[] }
   | { type: 'SET_TURN'; currentPlayer: string; round: number }
   | { type: 'SET_SCORES'; scores: Record<string, Record<string, number>> }
   | { type: 'GAME_END'; rankings: RankEntry[] }
-  | { type: 'GAME_SYNC'; dice: number[]; held: boolean[]; rollCount: number; scores: Record<string, Record<string, number>>; currentPlayer: string; round: number }
+  | { type: 'GAME_SYNC'; dice: number[]; held: boolean[]; rollCount: number; scores: Record<string, Record<string, number>>; currentPlayer: string; round: number; preview: Record<string, number> }
   | { type: 'ADD_REACTION'; playerId: string; emoji: string }
-  | { type: 'CLEAR_REACTION'; ts: number }
+  | { type: 'CLEAR_REACTION'; id: string }
+  | { type: 'SET_HOVERED'; category: string | null; playerId: string }
   | { type: 'RESET_GAME' };
 
 const initialState: GameState = {
@@ -49,6 +52,8 @@ const initialState: GameState = {
   scores: {},
   rankings: [],
   reactions: [],
+  preview: {},
+  hoveredCategory: null,
 };
 
 function reducer(state: GameState, action: GameAction): GameState {
@@ -64,25 +69,25 @@ function reducer(state: GameState, action: GameAction): GameState {
     case 'SET_ROOM_LIST':
       return { ...state, roomList: action.list };
     case 'GAME_ROLLED':
-      return { ...state, dice: action.dice, rollCount: action.rollCount, held: action.held ?? [false, false, false, false, false] };
-    case 'TOGGLE_HOLD': {
-      if (state.rollCount === 0) return state;
-      const newHeld = [...state.held];
-      newHeld[action.index] = !newHeld[action.index];
-      return { ...state, held: newHeld };
-    }
+      return { ...state, dice: action.dice, rollCount: action.rollCount, held: action.held ?? [false, false, false, false, false], preview: action.preview ?? {} };
+    case 'GAME_HELD':
+      return { ...state, held: action.held };
     case 'SET_TURN':
-      return { ...state, currentPlayer: action.currentPlayer, round: action.round, rollCount: 0, held: [false, false, false, false, false], dice: [] };
+      return { ...state, currentPlayer: action.currentPlayer, round: action.round, rollCount: 0, held: [false, false, false, false, false], dice: [], preview: {}, hoveredCategory: null };
     case 'SET_SCORES':
       return { ...state, scores: action.scores };
     case 'GAME_END':
       return { ...state, phase: 'result', rankings: action.rankings };
     case 'GAME_SYNC':
-      return { ...state, dice: action.dice, held: action.held, rollCount: action.rollCount, scores: action.scores, currentPlayer: action.currentPlayer, round: action.round, phase: 'game' };
-    case 'ADD_REACTION':
-      return { ...state, reactions: [...state.reactions, { playerId: action.playerId, emoji: action.emoji, ts: Date.now() }] };
+      return { ...state, dice: action.dice, held: action.held, rollCount: action.rollCount, scores: action.scores, currentPlayer: action.currentPlayer, round: action.round, phase: 'game', preview: action.preview ?? {} };
+    case 'SET_HOVERED':
+      return { ...state, hoveredCategory: { category: action.category, playerId: action.playerId } };
+    case 'ADD_REACTION': {
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      return { ...state, reactions: [...state.reactions, { playerId: action.playerId, emoji: action.emoji, id }] };
+    }
     case 'CLEAR_REACTION':
-      return { ...state, reactions: state.reactions.filter(r => r.ts !== action.ts) };
+      return { ...state, reactions: state.reactions.filter(r => r.id !== action.id) };
     case 'RESET_GAME':
       return { ...initialState, nickname: state.nickname };
     default:
