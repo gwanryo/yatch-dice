@@ -19,7 +19,7 @@ func TestNewEngine(t *testing.T) {
 
 func TestRoll(t *testing.T) {
 	e := NewEngine([]string{"p1", "p2"})
-	dice, err := e.Roll("p1", []int{})
+	dice, err := e.Roll("p1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,26 +35,18 @@ func TestRoll(t *testing.T) {
 
 func TestRollWrongPlayer(t *testing.T) {
 	e := NewEngine([]string{"p1", "p2"})
-	_, err := e.Roll("p2", []int{})
+	_, err := e.Roll("p2")
 	if err == nil {
 		t.Error("expected error for wrong player")
 	}
 }
 
-func TestRollFirstMustBeEmpty(t *testing.T) {
-	e := NewEngine([]string{"p1", "p2"})
-	_, err := e.Roll("p1", []int{0, 1})
-	if err == nil {
-		t.Error("expected error for held on first roll")
-	}
-}
-
 func TestRollMax3(t *testing.T) {
 	e := NewEngine([]string{"p1", "p2"})
-	e.Roll("p1", []int{})
-	e.Roll("p1", []int{0, 1})
-	e.Roll("p1", []int{0, 1, 2})
-	_, err := e.Roll("p1", []int{})
+	e.Roll("p1")
+	e.Roll("p1")
+	e.Roll("p1")
+	_, err := e.Roll("p1")
 	if err == nil {
 		t.Error("expected error for 4th roll")
 	}
@@ -62,7 +54,7 @@ func TestRollMax3(t *testing.T) {
 
 func TestScoreAndAdvance(t *testing.T) {
 	e := NewEngine([]string{"p1", "p2"})
-	e.Roll("p1", []int{})
+	e.Roll("p1")
 	score, err := e.Score("p1", "choice")
 	if err != nil {
 		t.Fatal(err)
@@ -77,11 +69,11 @@ func TestScoreAndAdvance(t *testing.T) {
 
 func TestScoreDuplicate(t *testing.T) {
 	e := NewEngine([]string{"p1", "p2"})
-	e.Roll("p1", []int{})
+	e.Roll("p1")
 	e.Score("p1", "choice")
-	e.Roll("p2", []int{})
+	e.Roll("p2")
 	e.Score("p2", "choice")
-	e.Roll("p1", []int{})
+	e.Roll("p1")
 	_, err := e.Score("p1", "choice")
 	if err == nil {
 		t.Error("expected error for duplicate category")
@@ -93,7 +85,7 @@ func TestGameEnd(t *testing.T) {
 	cats := AllCategories()
 	for round := 0; round < len(cats); round++ {
 		for _, pid := range []string{"p1", "p2"} {
-			e.Roll(pid, []int{})
+			e.Roll(pid)
 			e.Score(pid, cats[round])
 		}
 	}
@@ -110,12 +102,64 @@ func TestRemovePlayer(t *testing.T) {
 	}
 }
 
-func TestHeld(t *testing.T) {
+func TestHeldViaHold(t *testing.T) {
 	e := NewEngine([]string{"p1"})
-	e.Roll("p1", []int{})
-	e.Roll("p1", []int{0, 2, 4})
+	e.Roll("p1")
+	e.Hold("p1", 0)
+	e.Hold("p1", 2)
+	e.Hold("p1", 4)
 	h := e.Held()
 	if !h[0] || h[1] || !h[2] || h[3] || !h[4] {
 		t.Errorf("held = %v, want [true false true false true]", h)
+	}
+}
+
+func TestHoldToggle(t *testing.T) {
+	e := NewEngine([]string{"p1", "p2"})
+	e.Roll("p1") // first roll
+	held, err := e.Hold("p1", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !held[2] {
+		t.Error("dice 2 should be held")
+	}
+	// Toggle off
+	held, err = e.Hold("p1", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if held[2] {
+		t.Error("dice 2 should be unheld after toggle")
+	}
+}
+
+func TestHoldWrongPlayer(t *testing.T) {
+	e := NewEngine([]string{"p1", "p2"})
+	e.Roll("p1")
+	_, err := e.Hold("p2", 0)
+	if err == nil {
+		t.Error("expected error for wrong player")
+	}
+}
+
+func TestHoldBeforeRoll(t *testing.T) {
+	e := NewEngine([]string{"p1", "p2"})
+	_, err := e.Hold("p1", 0)
+	if err == nil {
+		t.Error("expected error when rollCount == 0")
+	}
+}
+
+func TestHoldInvalidIndex(t *testing.T) {
+	e := NewEngine([]string{"p1", "p2"})
+	e.Roll("p1")
+	_, err := e.Hold("p1", 5)
+	if err == nil {
+		t.Error("expected error for index 5")
+	}
+	_, err = e.Hold("p1", -1)
+	if err == nil {
+		t.Error("expected error for index -1")
 	}
 }
