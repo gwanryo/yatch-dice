@@ -11,7 +11,7 @@ interface Props {
   playerId: string | null;
 }
 
-export default function LobbyPage({ state, dispatch, send, on, playerId }: Props) {
+export default function LobbyPage({ state, dispatch, send, on }: Props) {
   const { t, i18n } = useTranslation();
   const [nickname, setNickname] = useState(state.nickname);
   const [code, setCode] = useState('');
