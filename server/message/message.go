@@ -30,6 +30,10 @@ const (
 	ErrWrongPassword  = "WRONG_PASSWORD"
 	ErrRoomNotFound   = "ROOM_NOT_FOUND"
 	ErrGameInProgress = "GAME_IN_PROGRESS"
+	ErrInvalidPayload = "INVALID_PAYLOAD"
+	ErrInvalidNick    = "INVALID_NICKNAME"
+	ErrAlreadyInRoom  = "ALREADY_IN_ROOM"
+	ErrInvalidIndex   = "INVALID_INDEX"
 )
 
 // Payloads: Lobby
@@ -66,13 +70,25 @@ type GameStartPayload struct {
 }
 
 // Payloads: Game
-type GameRollPayload struct {
-	Held []int `json:"held"` // indices 0-4
+type GameHoldPayload struct {
+	Index int `json:"index"`
+}
+type GameHeldPayload struct {
+	Held     [5]bool `json:"held"`
+	PlayerID string  `json:"playerId"`
+}
+type GameHoverPayload struct {
+	Category *string `json:"category"`
+}
+type GameHoveredPayload struct {
+	Category *string `json:"category"`
+	PlayerID string  `json:"playerId"`
 }
 type GameRolledPayload struct {
-	Dice      [5]int `json:"dice"`
-	Held      [5]bool `json:"held"`
-	RollCount int    `json:"rollCount"`
+	Dice      [5]int         `json:"dice"`
+	Held      [5]bool        `json:"held"`
+	RollCount int            `json:"rollCount"`
+	Preview   map[string]int `json:"preview"`
 }
 type GameScorePayload struct {
 	Category string `json:"category"`
@@ -94,6 +110,7 @@ type GameSyncPayload struct {
 	Scores        map[string]map[string]int `json:"scores"`
 	CurrentPlayer string                    `json:"currentPlayer"`
 	Round         int                       `json:"round"`
+	Preview       map[string]int            `json:"preview"`
 }
 type GameEndPayload struct {
 	Rankings []RankEntry `json:"rankings"`
@@ -103,6 +120,11 @@ type RankEntry struct {
 	Nickname string `json:"nickname"`
 	Score    int    `json:"score"`
 	Rank     int    `json:"rank"`
+}
+
+// Payloads: Rematch
+type RematchStatusPayload struct {
+	Votes []string `json:"votes"`
 }
 
 // Payloads: Reaction
