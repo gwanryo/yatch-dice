@@ -106,18 +106,26 @@ func (wh *WSHandler) handleDisconnect(p *player.Player) {
 	rm.Broadcast(data)
 
 	if rm.Status() == "playing" {
-		rm.HandleDisconnect(p.ID, func() {
+		// In a 2-player game, end immediately when opponent disconnects
+		if rm.PlayerCount() <= 2 {
 			rm.RemovePlayer(p.ID, func() { wh.hub.RemoveRoom(rm.Code) })
 			remData, _ := message.New("player:removed", message.PlayerEventPayload{PlayerID: p.ID})
 			rm.Broadcast(remData)
+			wh.endGame(rm)
+		} else {
+			rm.HandleDisconnect(p.ID, func() {
+				rm.RemovePlayer(p.ID, func() { wh.hub.RemoveRoom(rm.Code) })
+				remData, _ := message.New("player:removed", message.PlayerEventPayload{PlayerID: p.ID})
+				rm.Broadcast(remData)
 
-			if rm.PlayerCount() < 2 && rm.Status() == "playing" {
-				wh.endGame(rm)
-			} else {
-				rm.BroadcastState()
-				wh.broadcastTurn(rm)
-			}
-		})
+				if rm.PlayerCount() < 2 && rm.Status() == "playing" {
+					wh.endGame(rm)
+				} else {
+					rm.BroadcastState()
+					wh.broadcastTurn(rm)
+				}
+			})
+		}
 	} else {
 		wh.hub.LeaveRoom(p.ID)
 		leftData, _ := message.New("player:left", message.PlayerEventPayload{PlayerID: p.ID})

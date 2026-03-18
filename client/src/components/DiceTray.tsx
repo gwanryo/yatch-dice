@@ -3,16 +3,17 @@ interface Props {
   held: boolean[];
   rollCount: number;
   isMyTurn: boolean;
+  settled: boolean;
   onHold: (index: number) => void;
 }
 
-export default function DiceTray({ dice, held, rollCount, isMyTurn, onHold }: Props) {
-  const canInteract = isMyTurn && rollCount > 0;
+export default function DiceTray({ dice, held, rollCount, isMyTurn, settled, onHold }: Props) {
+  const canInteract = isMyTurn && rollCount > 0 && settled;
 
   return (
     <div className="flex flex-col items-center gap-3">
-      {/* Dice result buttons */}
-      {rollCount > 0 && dice.length === 5 && (
+      {/* Dice result buttons — only show after dice have settled */}
+      {settled && rollCount > 0 && dice.length === 5 && (
         <div className="flex gap-3">
           {dice.map((d, i) => (
             <button
