@@ -1,0 +1,52 @@
+{
+  "app": { "title": "Yacht Dice" },
+  "lobby": {
+    "nickname": "ニックネーム",
+    "nicknamePlaceholder": "ニックネームを入力",
+    "createRoom": "ルーム作成",
+    "joinByCode": "コードで参加",
+    "codePlaceholder": "ルームコード",
+    "password": "パスワード",
+    "passwordPlaceholder": "パスワード（任意）",
+    "join": "参加",
+    "refresh": "更新",
+    "noRooms": "ルームがありません",
+    "players": "人",
+    "waiting": "待機中",
+    "playing": "プレイ中"
+  },
+  "room": {
+    "code": "ルームコード",
+    "ready": "準備完了",
+    "cancel": "キャンセル",
+    "start": "ゲーム開始",
+    "leave": "退出",
+    "host": "ホスト",
+    "waitingForPlayers": "プレイヤーを待っています...",
+    "allReady": "全員準備完了"
+  },
+  "game": {
+    "round": "ラウンド",
+    "roll": "ロール",
+    "rollsLeft": "残りロール",
+    "shake": "Shake!",
+    "rollDice": "Roll!",
+    "selectCategory": "カテゴリを選択してください",
+    "yourTurn": "あなたのターン",
+    "waitingTurn": "のターン",
+    "score": "スコア"
+  },
+  "categories": {
+    "ones": "1", "twos": "2", "threes": "3",
+    "fours": "4", "fives": "5", "sixes": "6",
+    "choice": "チョイス", "fourOfAKind": "フォーカード", "fullHouse": "フルハウス",
+    "smallStraight": "Sストレート", "largeStraight": "Lストレート", "yacht": "ヨット",
+    "upperBonus": "上段ボーナス", "total": "合計"
+  },
+  "result": {
+    "title": "ゲーム結果",
+    "rank": "位",
+    "rematch": "もう一度",
+    "backToLobby": "ロビーへ"
+  }
+}

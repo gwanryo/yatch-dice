@@ -23,3 +23,13 @@ yarn-debug.log*
 yarn-error.log*
 
 .idea/
+.superpowers/
+.claude/
+
+# project-specific
+node_modules/
+dist/
+.env
+*.exe
+yacht-server
+dice-3d-demo.html
