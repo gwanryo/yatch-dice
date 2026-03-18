@@ -2,18 +2,20 @@
   "app": { "title": "Yacht Dice" },
   "lobby": {
     "nickname": "Nickname",
-    "nicknamePlaceholder": "Enter nickname",
+    "nicknamePlaceholder": "Enter nickname…",
     "createRoom": "Create Room",
     "joinByCode": "Join by Code",
-    "codePlaceholder": "Room code",
-    "password": "Password",
-    "passwordPlaceholder": "Password (optional)",
+    "codePlaceholder": "ABCDEF…",
+    "password": "Password…",
+    "passwordPlaceholder": "Password (optional)…",
+    "leaveConfirm": "Are you sure you want to leave this room?",
     "join": "Join",
     "refresh": "Refresh",
     "noRooms": "No rooms available",
     "players": "players",
     "waiting": "Waiting",
-    "playing": "Playing"
+    "playing": "Playing",
+    "enterPassword": "Enter room password"
   },
   "room": {
     "code": "Room Code",
@@ -22,7 +24,7 @@
     "start": "Start Game",
     "leave": "Leave",
     "host": "Host",
-    "waitingForPlayers": "Waiting for players...",
+    "waitingForPlayers": "Waiting for players\u2026",
     "allReady": "All players ready"
   },
   "game": {
@@ -33,7 +35,7 @@
     "rollDice": "Roll!",
     "selectCategory": "Select a category",
     "yourTurn": "Your turn",
-    "waitingTurn": "'s turn",
+    "waitingTurn": "{{name}}'s turn",
     "score": "Score"
   },
   "categories": {
@@ -45,8 +47,15 @@
   },
   "result": {
     "title": "Game Results",
-    "rank": "place",
+    "rankLabel": "{{rank}} place",
     "rematch": "Rematch",
     "backToLobby": "Back to Lobby"
+  },
+  "aria": {
+    "diceLabel": "Dice {{index}}: {{value}}",
+    "diceHeld": " (held)",
+    "sendReaction": "Send {{name}}",
+    "copyRoomCode": "Copy room code",
+    "diceScene": "3D dice game scene"
   }
 }

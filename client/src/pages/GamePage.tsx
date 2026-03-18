@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import DiceScene from '../components/DiceScene';
 import type { DiceSceneAPI } from '../components/DiceScene';
@@ -30,7 +30,11 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
 
   const handleRoll = () => {
     if (rollPhase !== 'shaking') return;
-    setRollPhase('rolling');
+    const ok = sceneRef.current?.roll();
+    if (ok) {
+      setRollPhase('rolling');
+      send('game:pour');
+    }
   };
 
   // Trigger animation when dice values arrive
@@ -40,27 +44,27 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
       if (api) {
         api.setHeld(state.held);
         api.setValues(state.dice);
-        if (isMyTurn) {
-          api.shake();
-          setRollPhase('shaking');
-        } else {
-          api.shake();
-          setTimeout(() => {
-            api.roll();
-            setRollPhase('rolling');
-          }, 1200);
-        }
+        api.shake();
+        setRollPhase('shaking');
       }
     }
     prevRollCountRef.current = state.rollCount;
   }, [state.rollCount, state.dice, state.held, isMyTurn]);
 
-  // Handle roll phase: when rolling -> tell scene to roll
+  // Remote players: roll when active player clicks Roll (game:pour)
+  const prevPourRef = useRef(state.pourCount);
   useEffect(() => {
-    if (rollPhase === 'rolling') {
+    if (state.pourCount > prevPourRef.current && !isMyTurn) {
       sceneRef.current?.roll();
+      setRollPhase('rolling');
     }
-  }, [rollPhase]);
+    prevPourRef.current = state.pourCount;
+  }, [state.pourCount, isMyTurn]);
+
+  // Sync held state to 3D scene whenever it changes (e.g. from game:held)
+  useEffect(() => {
+    sceneRef.current?.setHeld(state.held);
+  }, [state.held]);
 
   // Reset rollPhase when turn changes
   useEffect(() => {
@@ -72,41 +76,56 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
     setRollPhase('settled');
   }, []);
 
-  // Register onResult callback
   useEffect(() => {
-    sceneRef.current?.onResult(() => {
-      handleSettled();
-    });
+    sceneRef.current?.onResult(handleSettled);
   }, [handleSettled]);
 
-  const handleScore = (category: Category) => {
+  const handleScore = useCallback((category: Category) => {
     send('game:score', { category });
     setRollPhase('idle');
-  };
+  }, [send]);
 
-  const handleHold = (index: number) => {
+  const handleHold = useCallback((index: number) => {
     send('game:hold', { index });
-  };
+  }, [send]);
 
-  const handleHoverCategory = (category: string | null) => {
-    send('game:hover', { category });
-  };
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const handleHoverCategory = useCallback((category: string | null) => {
+    clearTimeout(hoverTimerRef.current);
+    if (category === null) {
+      hoverTimerRef.current = setTimeout(() => {
+        send('game:hover', { category: null });
+      }, 50);
+    } else {
+      send('game:hover', { category });
+    }
+  }, [send]);
 
-  const handleReaction = (emoji: string) => {
+  const handleReaction = useCallback((emoji: string) => {
     send('reaction:send', { emoji });
-  };
+  }, [send]);
 
-  const currentNick = state.players.find(p => p.id === state.currentPlayer)?.nickname ?? '';
+  const handleReactionExpire = useCallback((id: string) => {
+    dispatch({ type: 'CLEAR_REACTION', id });
+  }, [dispatch]);
+
+  const currentNick = useMemo(
+    () => state.players.find(p => p.id === state.currentPlayer)?.nickname ?? '',
+    [state.players, state.currentPlayer],
+  );
 
   return (
     <div className="fixed inset-0 overflow-hidden">
+      {/* Accessible heading for screen readers */}
+      <h1 className="sr-only">{t('app.title')} - {t('game.round')} {state.round}/12</h1>
+
       {/* 3D Scene — fullscreen background */}
       <DiceScene ref={sceneRef} />
 
       {/* UI Overlay */}
-      <div className="relative z-10 h-full flex flex-col pointer-events-none">
+      <main id="main-content" className="relative z-10 h-full flex flex-col pointer-events-none">
         {/* Top bar — turn indicator */}
-        <div className={`pointer-events-auto flex justify-between items-center px-4 py-2.5 transition-all ${
+        <header className={`pointer-events-auto flex justify-between items-center px-4 py-2.5 transition-[color,background-color,box-shadow] duration-300 ${
           isMyTurn
             ? 'bg-gradient-to-r from-yellow-600/80 via-amber-500/80 to-yellow-600/80 shadow-lg shadow-yellow-500/20'
             : 'bg-black/40 backdrop-blur-sm'
@@ -115,20 +134,20 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
             {t('game.round')} {state.round}/12
           </span>
           <span className={`text-sm font-bold ${isMyTurn ? 'text-white' : 'text-gray-300'}`} aria-live="polite">
-            {isMyTurn ? t('game.yourTurn') : currentNick + t('game.waitingTurn')}
+            {isMyTurn ? t('game.yourTurn') : t('game.waitingTurn', { name: currentNick })}
           </span>
           <span className="text-white/70 text-sm tabular-nums">
             {t('game.rollsLeft')}: {3 - state.rollCount}
           </span>
-        </div>
+        </header>
 
         {/* Main area */}
-        <div className="flex-1 flex">
+        <div className="flex-1 flex flex-col lg:flex-row">
           {/* Spacer for 3D scene */}
           <div className="flex-1" />
 
-          {/* ScoreBoard — right sidebar */}
-          <div className="pointer-events-auto lg:w-80 p-4">
+          {/* ScoreBoard — right sidebar on desktop, top overlay on mobile */}
+          <div className="pointer-events-auto w-full lg:w-80 p-2 lg:p-4 order-first lg:order-last">
             <ScoreBoard
               players={state.players}
               scores={state.scores}
@@ -137,6 +156,7 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
               rollCount={state.rollCount}
               preview={state.preview}
               hoveredCategory={state.hoveredCategory}
+              minimized={rollPhase === 'shaking' || rollPhase === 'rolling'}
               onSelectCategory={isMyTurn && state.rollCount > 0 ? handleScore : undefined}
               onHoverCategory={isMyTurn && state.rollCount > 0 ? handleHoverCategory : undefined}
             />
@@ -144,25 +164,26 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
         </div>
 
         {/* Bottom area — dice tray + buttons */}
-        <div className="pointer-events-auto flex flex-col items-center gap-3 pb-4">
+        <div className="pointer-events-auto flex flex-col items-center gap-3 pb-[max(1rem,env(safe-area-inset-bottom))] px-2">
           <DiceTray
             dice={state.dice}
             held={state.held}
             rollCount={state.rollCount}
             isMyTurn={isMyTurn}
+            settled={rollPhase === 'settled' || rollPhase === 'idle'}
             onHold={handleHold}
           />
           <div className="flex gap-4">
             {rollPhase === 'shaking' && isMyTurn && (
               <button onClick={handleRoll}
-                className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-lg transition-colors focus-visible:ring-2 focus-visible:ring-white shadow-lg">
-                Roll!
+                className="px-8 py-3 bg-green-600 hover:bg-green-700 active:scale-[0.97] text-white font-bold rounded-xl text-lg transition-[colors,transform] focus-visible:ring-2 focus-visible:ring-white shadow-lg">
+                {t('game.rollDice')}
               </button>
             )}
             {rollPhase !== 'shaking' && rollPhase !== 'rolling' && (
               <button onClick={handleShake}
                 disabled={!isMyTurn || state.rollCount >= 3}
-                className="px-8 py-3 bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white font-bold rounded-xl text-lg transition-colors focus-visible:ring-2 focus-visible:ring-white shadow-lg">
+                className="px-8 py-3 bg-orange-500 hover:bg-orange-600 active:scale-[0.97] disabled:opacity-40 text-white font-bold rounded-xl text-lg transition-[colors,transform] focus-visible:ring-2 focus-visible:ring-white shadow-lg">
                 {t('game.shake')}
                 {state.rollCount > 0 && ` (${3 - state.rollCount})`}
               </button>
@@ -171,11 +192,11 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
           <ReactionBar
             onSend={handleReaction}
             reactions={state.reactions}
-            onExpire={(id) => dispatch({ type: 'CLEAR_REACTION', id })}
+            onExpire={handleReactionExpire}
             players={state.players}
           />
         </div>
-      </div>
+      </main>
     </div>
   );
 }

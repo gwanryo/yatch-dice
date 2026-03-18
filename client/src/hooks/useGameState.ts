@@ -1,6 +1,6 @@
 import { useReducer } from 'react';
 import type {
-  GamePhase, PlayerInfo, RoomListItem, RankEntry,
+  GamePhase, PlayerInfo, RankEntry,
 } from '../types/game';
 
 export interface GameState {
@@ -8,7 +8,6 @@ export interface GameState {
   nickname: string;
   roomCode: string | null;
   players: PlayerInfo[];
-  roomList: RoomListItem[];
   dice: number[];
   held: boolean[];
   rollCount: number;
@@ -19,6 +18,7 @@ export interface GameState {
   reactions: { playerId: string; emoji: string; id: string }[];
   preview: Record<string, number>;
   hoveredCategory: { category: string | null; playerId: string } | null;
+  pourCount: number;
 }
 
 export type GameAction =
@@ -26,7 +26,6 @@ export type GameAction =
   | { type: 'SET_PHASE'; phase: GamePhase }
   | { type: 'SET_ROOM'; roomCode: string }
   | { type: 'SET_PLAYERS'; players: PlayerInfo[] }
-  | { type: 'SET_ROOM_LIST'; list: RoomListItem[] }
   | { type: 'GAME_ROLLED'; dice: number[]; held: boolean[]; rollCount: number; preview: Record<string, number> }
   | { type: 'GAME_HELD'; held: boolean[] }
   | { type: 'SET_TURN'; currentPlayer: string; round: number }
@@ -36,6 +35,8 @@ export type GameAction =
   | { type: 'ADD_REACTION'; playerId: string; emoji: string }
   | { type: 'CLEAR_REACTION'; id: string }
   | { type: 'SET_HOVERED'; category: string | null; playerId: string }
+  | { type: 'GAME_POUR' }
+  | { type: 'REMOVE_PLAYER'; playerId: string }
   | { type: 'RESET_GAME' };
 
 const initialState: GameState = {
@@ -43,7 +44,6 @@ const initialState: GameState = {
   nickname: '',
   roomCode: null,
   players: [],
-  roomList: [],
   dice: [],
   held: [false, false, false, false, false],
   rollCount: 0,
@@ -54,6 +54,7 @@ const initialState: GameState = {
   reactions: [],
   preview: {},
   hoveredCategory: null,
+  pourCount: 0,
 };
 
 function reducer(state: GameState, action: GameAction): GameState {
@@ -66,14 +67,12 @@ function reducer(state: GameState, action: GameAction): GameState {
       return { ...state, roomCode: action.roomCode, phase: 'room' };
     case 'SET_PLAYERS':
       return { ...state, players: action.players };
-    case 'SET_ROOM_LIST':
-      return { ...state, roomList: action.list };
     case 'GAME_ROLLED':
       return { ...state, dice: action.dice, rollCount: action.rollCount, held: action.held ?? [false, false, false, false, false], preview: action.preview ?? {} };
     case 'GAME_HELD':
       return { ...state, held: action.held };
     case 'SET_TURN':
-      return { ...state, currentPlayer: action.currentPlayer, round: action.round, rollCount: 0, held: [false, false, false, false, false], dice: [], preview: {}, hoveredCategory: null };
+      return { ...state, currentPlayer: action.currentPlayer, round: action.round, rollCount: 0, held: [false, false, false, false, false], dice: [], preview: {}, hoveredCategory: null, pourCount: 0 };
     case 'SET_SCORES':
       return { ...state, scores: action.scores };
     case 'GAME_END':
@@ -86,8 +85,12 @@ function reducer(state: GameState, action: GameAction): GameState {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
       return { ...state, reactions: [...state.reactions, { playerId: action.playerId, emoji: action.emoji, id }] };
     }
+    case 'GAME_POUR':
+      return { ...state, pourCount: state.pourCount + 1 };
     case 'CLEAR_REACTION':
       return { ...state, reactions: state.reactions.filter(r => r.id !== action.id) };
+    case 'REMOVE_PLAYER':
+      return { ...state, players: state.players.filter(p => p.id !== action.playerId) };
     case 'RESET_GAME':
       return { ...initialState, nickname: state.nickname };
     default:

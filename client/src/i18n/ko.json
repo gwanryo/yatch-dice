@@ -2,18 +2,20 @@
   "app": { "title": "Yacht Dice" },
   "lobby": {
     "nickname": "닉네임",
-    "nicknamePlaceholder": "닉네임을 입력하세요",
+    "nicknamePlaceholder": "닉네임을 입력하세요…",
     "createRoom": "방 만들기",
     "joinByCode": "코드로 참여",
-    "codePlaceholder": "방 코드 입력",
-    "password": "비밀번호",
-    "passwordPlaceholder": "비밀번호 (선택사항)",
+    "codePlaceholder": "ABCDEF…",
+    "password": "비밀번호…",
+    "passwordPlaceholder": "비밀번호 (선택사항)…",
+    "leaveConfirm": "정말로 방을 나가시겠습니까?",
     "join": "참여",
     "refresh": "새로고침",
     "noRooms": "방이 없습니다",
     "players": "명",
     "waiting": "대기 중",
-    "playing": "게임 중"
+    "playing": "게임 중",
+    "enterPassword": "방 비밀번호를 입력하세요"
   },
   "room": {
     "code": "방 코드",
@@ -22,7 +24,7 @@
     "start": "게임 시작",
     "leave": "나가기",
     "host": "방장",
-    "waitingForPlayers": "플레이어를 기다리는 중...",
+    "waitingForPlayers": "플레이어를 기다리는 중\u2026",
     "allReady": "모든 플레이어가 준비되었습니다"
   },
   "game": {
@@ -33,7 +35,7 @@
     "rollDice": "Roll!",
     "selectCategory": "카테고리를 선택하세요",
     "yourTurn": "당신의 턴",
-    "waitingTurn": "의 턴입니다",
+    "waitingTurn": "{{name}}의 턴입니다",
     "score": "점수"
   },
   "categories": {
@@ -45,8 +47,15 @@
   },
   "result": {
     "title": "게임 결과",
-    "rank": "등",
+    "rankLabel": "{{rank}}등",
     "rematch": "다시하기",
     "backToLobby": "로비로"
+  },
+  "aria": {
+    "diceLabel": "주사위 {{index}}: {{value}}",
+    "diceHeld": " (고정됨)",
+    "sendReaction": "{{name}} 보내기",
+    "copyRoomCode": "방 코드 복사",
+    "diceScene": "3D 주사위 게임 장면"
   }
 }

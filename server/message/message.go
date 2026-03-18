@@ -21,6 +21,40 @@ func Parse(data []byte) (Envelope, error) {
 	return e, err
 }
 
+// ValidCategory checks if the given string is a known scoring category.
+func ValidCategory(cat string) bool {
+	switch cat {
+	case "ones", "twos", "threes", "fours", "fives", "sixes",
+		"choice", "fourOfAKind", "fullHouse",
+		"smallStraight", "largeStraight", "yacht":
+		return true
+	}
+	return false
+}
+
+// validEmojis is the set of allowed reaction emojis.
+var validEmojis = map[string]bool{
+	"\U0001F44D": true, // thumbs up
+	"\U0001F44E": true, // thumbs down
+	"\U0001F602": true, // face with tears of joy
+	"\U0001F622": true, // crying face
+	"\U0001F621": true, // pouting face
+	"\U0001F60E": true, // smiling face with sunglasses
+	"\U0001F389": true, // party popper
+	"\U0001F525": true, // fire
+	"\U0001F4A9": true, // pile of poo
+	"\U0001F914": true, // thinking face
+}
+
+// ValidEmojis returns the set of allowed reaction emojis.
+func ValidEmojis() map[string]bool {
+	out := make(map[string]bool, len(validEmojis))
+	for k, v := range validEmojis {
+		out[k] = v
+	}
+	return out
+}
+
 // Error codes
 const (
 	ErrNotYourTurn    = "NOT_YOUR_TURN"
@@ -31,8 +65,6 @@ const (
 	ErrRoomNotFound   = "ROOM_NOT_FOUND"
 	ErrGameInProgress = "GAME_IN_PROGRESS"
 	ErrInvalidPayload = "INVALID_PAYLOAD"
-	ErrInvalidNick    = "INVALID_NICKNAME"
-	ErrAlreadyInRoom  = "ALREADY_IN_ROOM"
 	ErrInvalidIndex   = "INVALID_INDEX"
 )
 
@@ -139,6 +171,7 @@ type ReactionShowPayload struct {
 // Payloads: Connection
 type ConnectedPayload struct {
 	PlayerID string `json:"playerId"`
+	Token    string `json:"token"`
 }
 type PlayerEventPayload struct {
 	PlayerID string `json:"playerId"`

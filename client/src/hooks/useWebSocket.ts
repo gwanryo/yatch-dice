@@ -6,18 +6,27 @@ type MessageHandler = (env: Envelope) => void;
 export function useWebSocket(nickname: string) {
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
+  const [connectionFailed, setConnectionFailed] = useState(false);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const playerIdRef = useRef<string | null>(null);
   const nicknameRef = useRef(nickname);
   const handlersRef = useRef<Map<string, MessageHandler[]>>(new Map());
   const queueRef = useRef<string[]>([]);
   const retriesRef = useRef(0);
+  const connectRef = useRef<(() => void) | null>(null);
   const maxRetries = 5;
 
   useEffect(() => { nicknameRef.current = nickname; }, [nickname]);
   useEffect(() => { playerIdRef.current = playerId; }, [playerId]);
 
   const connect = useCallback(() => {
+    // Close existing connection before creating a new one
+    if (wsRef.current) {
+      wsRef.current.onclose = null;
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     const params = new URLSearchParams({ nickname: nicknameRef.current });
@@ -27,8 +36,17 @@ export function useWebSocket(nickname: string) {
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
+    // Connection timeout: if not open within 10s, treat as failed
+    const connectTimeout = setTimeout(() => {
+      if (ws.readyState !== WebSocket.OPEN) {
+        ws.close();
+      }
+    }, 10000);
+
     ws.onopen = () => {
+      clearTimeout(connectTimeout);
       setConnected(true);
+      setConnectionFailed(false);
       retriesRef.current = 0;
       while (queueRef.current.length > 0) {
         const msg = queueRef.current.shift()!;
@@ -37,10 +55,13 @@ export function useWebSocket(nickname: string) {
     };
 
     ws.onclose = () => {
+      clearTimeout(connectTimeout);
       setConnected(false);
       if (retriesRef.current < maxRetries) {
         retriesRef.current++;
-        setTimeout(connect, 3000);
+        setTimeout(() => connectRef.current?.(), 3000);
+      } else {
+        setConnectionFailed(true);
       }
     };
 
@@ -66,11 +87,16 @@ export function useWebSocket(nickname: string) {
     };
   }, []);
 
+  useEffect(() => { connectRef.current = connect; }, [connect]);
+
   const send = useCallback((type: string, payload?: unknown) => {
     const msg = JSON.stringify({ type, payload });
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(msg);
     } else {
+      if (queueRef.current.length >= 50) {
+        queueRef.current.shift();
+      }
       queueRef.current.push(msg);
     }
   }, []);
@@ -94,5 +120,11 @@ export function useWebSocket(nickname: string) {
     wsRef.current?.close();
   }, []);
 
-  return { connect, disconnect, send, on, connected, playerId };
+  const reconnect = useCallback(() => {
+    retriesRef.current = 0;
+    setConnectionFailed(false);
+    connect();
+  }, [connect]);
+
+  return { connect, disconnect, reconnect, send, on, connected, connectionFailed, playerId };
 }
