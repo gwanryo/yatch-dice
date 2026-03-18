@@ -1,0 +1,52 @@
+{
+  "app": { "title": "Yacht Dice" },
+  "lobby": {
+    "nickname": "Nickname",
+    "nicknamePlaceholder": "Enter nickname",
+    "createRoom": "Create Room",
+    "joinByCode": "Join by Code",
+    "codePlaceholder": "Room code",
+    "password": "Password",
+    "passwordPlaceholder": "Password (optional)",
+    "join": "Join",
+    "refresh": "Refresh",
+    "noRooms": "No rooms available",
+    "players": "players",
+    "waiting": "Waiting",
+    "playing": "Playing"
+  },
+  "room": {
+    "code": "Room Code",
+    "ready": "Ready",
+    "cancel": "Cancel",
+    "start": "Start Game",
+    "leave": "Leave",
+    "host": "Host",
+    "waitingForPlayers": "Waiting for players...",
+    "allReady": "All players ready"
+  },
+  "game": {
+    "round": "Round",
+    "roll": "Roll",
+    "rollsLeft": "rolls left",
+    "shake": "Shake!",
+    "rollDice": "Roll!",
+    "selectCategory": "Select a category",
+    "yourTurn": "Your turn",
+    "waitingTurn": "'s turn",
+    "score": "Score"
+  },
+  "categories": {
+    "ones": "Ones", "twos": "Twos", "threes": "Threes",
+    "fours": "Fours", "fives": "Fives", "sixes": "Sixes",
+    "choice": "Choice", "fourOfAKind": "Four of a Kind", "fullHouse": "Full House",
+    "smallStraight": "Sm. Straight", "largeStraight": "Lg. Straight", "yacht": "Yacht",
+    "upperBonus": "Upper Bonus", "total": "Total"
+  },
+  "result": {
+    "title": "Game Results",
+    "rank": "place",
+    "rematch": "Rematch",
+    "backToLobby": "Back to Lobby"
+  }
+}
