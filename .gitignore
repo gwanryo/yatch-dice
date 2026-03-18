@@ -33,3 +33,4 @@ dist/
 *.exe
 yacht-server
 dice-3d-demo.html
+docs/*.png
