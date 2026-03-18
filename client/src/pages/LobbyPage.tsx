@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { GameAction } from '../hooks/useGameState';
 import type { GameState } from '../hooks/useGameState';
-import type { RoomListItem } from '../types/game';
 
 interface Props {
   state: GameState;
@@ -22,21 +21,17 @@ export default function LobbyPage({ state, dispatch, send, on, playerId }: Props
 
   useEffect(() => {
     if (!nicknameConfirmed) return;
-    const unsub1 = on('room:list', (env: any) => {
-      dispatch({ type: 'SET_ROOM_LIST', list: env.payload as RoomListItem[] });
-    });
-    const unsub2 = on('room:created', (env: any) => {
+    const unsub1 = on('room:created', (env: any) => {
       const p = env.payload as { roomCode: string };
       dispatch({ type: 'SET_ROOM', roomCode: p.roomCode });
     });
-    const unsub3 = on('room:joined', () => {});
-    const unsub4 = on('room:state', (env: any) => {
+    const unsub2 = on('room:joined', () => {});
+    const unsub3 = on('room:state', (env: any) => {
       const p = env.payload as { roomCode: string; players: any[] };
       dispatch({ type: 'SET_ROOM', roomCode: p.roomCode });
       dispatch({ type: 'SET_PLAYERS', players: p.players });
     });
-    send('room:list');
-    return () => { unsub1(); unsub2(); unsub3(); unsub4(); };
+    return () => { unsub1(); unsub2(); unsub3(); };
   }, [on, send, dispatch, nicknameConfirmed]);
 
   const handleNicknameSubmit = () => {
@@ -131,42 +126,6 @@ export default function LobbyPage({ state, dispatch, send, on, playerId }: Props
           </button>
         </div>
 
-        <div className="bg-black/30 backdrop-blur rounded-xl p-4">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-gray-400 text-sm">{t('lobby.joinByCode')}</span>
-            <button onClick={() => send('room:list')} className="text-sm text-purple-400 hover:text-purple-300 focus-visible:ring-2 focus-visible:ring-white rounded">
-              {t('lobby.refresh')}
-            </button>
-          </div>
-          {state.roomList.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">{t('lobby.noRooms')}</p>
-          ) : (
-            <div className="space-y-2">
-              {state.roomList.map(r => (
-                <button key={r.code}
-                  onClick={() => {
-                    if (r.status !== 'waiting') return;
-                    if (r.hasPassword) {
-                      const pw = prompt(t('lobby.enterPassword'));
-                      if (pw != null) handleJoin(r.code, pw);
-                    } else {
-                      handleJoin(r.code);
-                    }
-                  }}
-                  disabled={r.status !== 'waiting'}
-                  className={`flex w-full justify-between items-center p-3 rounded-lg text-left ${r.status === 'waiting' ? 'bg-white/5 hover:bg-white/10' : 'bg-white/5 opacity-50'}`}>
-                  <span className="text-white font-mono">{r.code}{r.hasPassword ? ' 🔒' : ''}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-gray-400 text-sm">{r.playerCount}/4 {t('lobby.players')}</span>
-                    <span className={`text-xs ${r.status === 'waiting' ? 'text-green-400' : 'text-orange-400'}`}>
-                      {t(`lobby.${r.status}`)}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

@@ -40,27 +40,34 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
       if (api) {
         api.setHeld(state.held);
         api.setValues(state.dice);
+        api.shake();
         if (isMyTurn) {
-          api.shake();
+          // Active player: show shaking, wait for Roll button click
           setRollPhase('shaking');
         } else {
-          api.shake();
+          // Spectator: auto shake then auto roll after delay
+          setRollPhase('shaking');
           setTimeout(() => {
             api.roll();
             setRollPhase('rolling');
-          }, 1200);
+          }, 800);
         }
       }
     }
     prevRollCountRef.current = state.rollCount;
   }, [state.rollCount, state.dice, state.held, isMyTurn]);
 
-  // Handle roll phase: when rolling -> tell scene to roll
+  // Handle roll phase: when user clicks Roll button -> tell scene to roll
   useEffect(() => {
     if (rollPhase === 'rolling') {
       sceneRef.current?.roll();
     }
   }, [rollPhase]);
+
+  // Sync held state to 3D scene whenever it changes (e.g. from game:held)
+  useEffect(() => {
+    sceneRef.current?.setHeld(state.held);
+  }, [state.held]);
 
   // Reset rollPhase when turn changes
   useEffect(() => {
@@ -150,6 +157,7 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
             held={state.held}
             rollCount={state.rollCount}
             isMyTurn={isMyTurn}
+            settled={rollPhase === 'settled' || rollPhase === 'idle'}
             onHold={handleHold}
           />
           <div className="flex gap-4">
