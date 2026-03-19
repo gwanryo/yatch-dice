@@ -77,11 +77,6 @@ export interface ReactionShowPayload {
   emoji: string;
 }
 
-export interface ErrorPayload {
-  message: string;
-  code: string;
-}
-
 export type GamePhase = 'lobby' | 'room' | 'game' | 'result';
 
 export const CATEGORIES = [

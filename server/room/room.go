@@ -2,7 +2,6 @@ package room
 
 import (
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"sync"
@@ -393,8 +392,3 @@ func (r *Room) NicknameMap() map[string]string {
 	return m
 }
 
-func Decode[T any](raw json.RawMessage) (T, error) {
-	var v T
-	err := json.Unmarshal(raw, &v)
-	return v, err
-}

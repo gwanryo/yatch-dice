@@ -31,8 +31,6 @@ const (
 	ErrRoomNotFound   = "ROOM_NOT_FOUND"
 	ErrGameInProgress = "GAME_IN_PROGRESS"
 	ErrInvalidPayload = "INVALID_PAYLOAD"
-	ErrInvalidNick    = "INVALID_NICKNAME"
-	ErrAlreadyInRoom  = "ALREADY_IN_ROOM"
 	ErrInvalidIndex   = "INVALID_INDEX"
 )
 

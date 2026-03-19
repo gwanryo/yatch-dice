@@ -41,27 +41,19 @@ export default function ScoreBoard({
     return (
       <tr
         key={cat}
+        onClick={() => canSelect && onSelectCategory?.(cat)}
         className={`transition-colors ${
           isMyHover ? 'bg-yellow-500/20' :
           isOtherHover ? 'bg-blue-500/10' :
-          canSelect ? 'hover:bg-yellow-500/15' : ''
+          canSelect ? 'hover:bg-yellow-500/15 cursor-pointer' : ''
         }`}
         onMouseEnter={() => canSelect && onHoverCategory?.(cat)}
         onMouseLeave={() => canSelect && onHoverCategory?.(null)}
       >
         <td className={`px-2 py-1.5 text-sm font-medium ${
-          canSelect ? 'text-yellow-300' : 'text-gray-400'
+          canSelect ? 'text-yellow-300 font-semibold' : 'text-gray-400'
         }`}>
-          {canSelect ? (
-            <button
-              onClick={() => onSelectCategory?.(cat)}
-              className="w-full text-left text-yellow-300 hover:text-yellow-100 font-semibold focus-visible:ring-2 focus-visible:ring-yellow-400 rounded px-1 -mx-1"
-            >
-              {t(`categories.${cat}`)}
-            </button>
-          ) : (
-            t(`categories.${cat}`)
-          )}
+          {t(`categories.${cat}`)}
         </td>
         {players.map(p => {
           const scored = scores[p.id]?.[cat];

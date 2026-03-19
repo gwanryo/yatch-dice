@@ -6,6 +6,7 @@ type MessageHandler = (env: Envelope) => void;
 export function useWebSocket(nickname: string) {
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
+  const [connectionFailed, setConnectionFailed] = useState(false);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const playerIdRef = useRef<string | null>(null);
   const nicknameRef = useRef(nickname);
@@ -29,6 +30,7 @@ export function useWebSocket(nickname: string) {
 
     ws.onopen = () => {
       setConnected(true);
+      setConnectionFailed(false);
       retriesRef.current = 0;
       while (queueRef.current.length > 0) {
         const msg = queueRef.current.shift()!;
@@ -41,6 +43,8 @@ export function useWebSocket(nickname: string) {
       if (retriesRef.current < maxRetries) {
         retriesRef.current++;
         setTimeout(connect, 3000);
+      } else {
+        setConnectionFailed(true);
       }
     };
 
@@ -71,6 +75,9 @@ export function useWebSocket(nickname: string) {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(msg);
     } else {
+      if (queueRef.current.length >= 50) {
+        queueRef.current.shift();
+      }
       queueRef.current.push(msg);
     }
   }, []);
@@ -94,5 +101,11 @@ export function useWebSocket(nickname: string) {
     wsRef.current?.close();
   }, []);
 
-  return { connect, disconnect, send, on, connected, playerId };
+  const reconnect = useCallback(() => {
+    retriesRef.current = 0;
+    setConnectionFailed(false);
+    connect();
+  }, [connect]);
+
+  return { connect, disconnect, reconnect, send, on, connected, connectionFailed, playerId };
 }

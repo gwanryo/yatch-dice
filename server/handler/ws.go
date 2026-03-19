@@ -106,21 +106,22 @@ func (wh *WSHandler) handleDisconnect(p *player.Player) {
 	rm.Broadcast(data)
 
 	if rm.Status() == "playing" {
-		// In a 2-player game, end immediately when opponent disconnects
 		if rm.PlayerCount() <= 2 {
+			// End game BEFORE removing player — RemovePlayer destroys the engine
+			wh.endGame(rm)
 			rm.RemovePlayer(p.ID, func() { wh.hub.RemoveRoom(rm.Code) })
 			remData, _ := message.New("player:removed", message.PlayerEventPayload{PlayerID: p.ID})
 			rm.Broadcast(remData)
-			wh.endGame(rm)
 		} else {
 			rm.HandleDisconnect(p.ID, func() {
+				shouldEnd := rm.PlayerCount() <= 2 && rm.Status() == "playing"
+				if shouldEnd {
+					wh.endGame(rm)
+				}
 				rm.RemovePlayer(p.ID, func() { wh.hub.RemoveRoom(rm.Code) })
 				remData, _ := message.New("player:removed", message.PlayerEventPayload{PlayerID: p.ID})
 				rm.Broadcast(remData)
-
-				if rm.PlayerCount() < 2 && rm.Status() == "playing" {
-					wh.endGame(rm)
-				} else {
+				if !shouldEnd && rm.PlayerCount() >= 2 {
 					rm.BroadcastState()
 					wh.broadcastTurn(rm)
 				}
@@ -156,6 +157,8 @@ func (wh *WSHandler) handleMessage(p *player.Player, env message.Envelope) {
 		wh.handleHover(p, env.Payload)
 	case "game:score":
 		wh.handleScore(p, env.Payload)
+	case "game:pour":
+		wh.handlePour(p)
 	case "game:rematch":
 		wh.handleRematch(p)
 	case "reaction:send":
@@ -250,7 +253,7 @@ func (wh *WSHandler) handleStart(p *player.Player) {
 	wh.broadcastTurn(rm)
 }
 
-func (wh *WSHandler) handleRoll(p *player.Player, payload json.RawMessage) {
+func (wh *WSHandler) handleRoll(p *player.Player, _ json.RawMessage) {
 	rm := wh.hub.PlayerRoom(p.ID)
 	if rm == nil {
 		return
@@ -353,6 +356,19 @@ func (wh *WSHandler) broadcastTurn(rm *room.Room) {
 	data, _ := message.New("game:turn", message.GameTurnPayload{
 		CurrentPlayer: currentPlayer, Round: round,
 	})
+	rm.Broadcast(data)
+}
+
+func (wh *WSHandler) handlePour(p *player.Player) {
+	rm := wh.hub.PlayerRoom(p.ID)
+	if rm == nil {
+		return
+	}
+	currentPlayer, _, _, ok := rm.TurnInfo()
+	if !ok || currentPlayer != p.ID {
+		return
+	}
+	data, _ := message.New("game:pour", nil)
 	rm.Broadcast(data)
 }
 

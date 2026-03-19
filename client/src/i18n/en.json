@@ -13,7 +13,8 @@
     "noRooms": "No rooms available",
     "players": "players",
     "waiting": "Waiting",
-    "playing": "Playing"
+    "playing": "Playing",
+    "enterPassword": "Enter room password"
   },
   "room": {
     "code": "Room Code",

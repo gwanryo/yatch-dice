@@ -7,7 +7,7 @@ export interface DiceSceneAPI {
   setValues(v: number[]): void;
   setHeld(h: boolean[]): void;
   shake(): void;
-  roll(): void;
+  roll(): boolean;
   onResult(cb: (values: number[]) => void): void;
 }
 
@@ -177,12 +177,6 @@ function createDiceScene(canvas: HTMLCanvasElement) {
     return best;
   }
 
-  // Verify face quats
-  for (let v = 1; v <= 6; v++) {
-    const a = readTopFace(faceQuats[v]);
-    if (a !== v) console.error(`faceQuats[${v}] shows ${a}!`);
-  }
-
   /* ── Dice meshes ── */
   function pipTex(val: number) {
     const s = 256, c = document.createElement('canvas');
@@ -210,10 +204,26 @@ function createDiceScene(canvas: HTMLCanvasElement) {
 
   function mkDie() {
     const g = new THREE.BoxGeometry(DICE_SIZE, DICE_SIZE, DICE_SIZE);
-    const ms = FACE_MAP.map(v => new THREE.MeshStandardMaterial({ map: pipTex(v), roughness: 0.4, metalness: 0.05 }));
+    const ms = FACE_MAP.map(v => new THREE.MeshStandardMaterial({ map: pipTex(v), roughness: 0.4, metalness: 0.05, transparent: true }));
     const m = new THREE.Mesh(g, ms);
     m.castShadow = m.receiveShadow = true;
     return m;
+  }
+
+  const diceOpacity = [1, 1, 1, 1, 1];
+  const FADE_SPEED = 0.08;
+
+  function updateDiceOpacity() {
+    for (let i = 0; i < 5; i++) {
+      const shouldHide = heldDice[i] && state !== S.IDLE && state !== S.PRESENT && state !== S.RESULT;
+      const target = shouldHide ? 0 : 1;
+      diceOpacity[i] += (target - diceOpacity[i]) * FADE_SPEED;
+      if (Math.abs(diceOpacity[i] - target) < 0.01) diceOpacity[i] = target;
+      const mats = diceMeshes[i].material as THREE.MeshStandardMaterial[];
+      mats.forEach(m => { m.opacity = diceOpacity[i]; });
+      diceMeshes[i].castShadow = diceOpacity[i] > 0.5;
+      diceMeshes[i].visible = diceOpacity[i] > 0.01;
+    }
   }
 
   const diceMeshes: THREE.Mesh[] = [];
@@ -446,6 +456,7 @@ function createDiceScene(canvas: HTMLCanvasElement) {
   let state: State = S.IDLE;
   let targetVals: (number | null)[] = [null, null, null, null, null];
   let _onResultCallback: ((values: number[]) => void) | null = null;
+  let _pendingRoll = false;
 
   function setDiceShadows(on: boolean) { diceMeshes.forEach(m => m.castShadow = on); }
 
@@ -525,7 +536,8 @@ function createDiceScene(canvas: HTMLCanvasElement) {
 
   function constrainDiceToCup() {
     cupBody.quaternion.conjugate(_invQ);
-    diceBodies.forEach(body => {
+    diceBodies.forEach((body, i) => {
+      if (heldDice[i]) return;
       body.position.vsub(cupBody.position, _rel);
       _invQ.vmult(_rel, _local);
       const t = Math.max(0, Math.min(_local.y / CUP_H, 1));
@@ -559,6 +571,11 @@ function createDiceScene(canvas: HTMLCanvasElement) {
       if (t >= 1) {
         shakePhase = 1;
         shakeStart = performance.now();
+        if (_pendingRoll) {
+          _pendingRoll = false;
+          startRoll();
+          return;
+        }
         diceBodies.forEach((b, i) => {
           if (heldDice[i]) return;
           b.type = CANNON.Body.DYNAMIC;
@@ -588,7 +605,8 @@ function createDiceScene(canvas: HTMLCanvasElement) {
     cupBody.quaternion.setFromEuler(rx, ry, rz);
 
     if (se % 800 < 17) {
-      diceBodies.forEach(b => {
+      diceBodies.forEach((b, i) => {
+        if (heldDice[i]) return;
         if (b.velocity.length() < 2) {
           _nudgeForce.set((Math.random() - 0.5) * 0.12, 0.08, (Math.random() - 0.5) * 0.12);
           b.applyImpulse(_nudgeForce, _nudgePoint);
@@ -596,7 +614,8 @@ function createDiceScene(canvas: HTMLCanvasElement) {
       });
     }
 
-    diceBodies.forEach(b => {
+    diceBodies.forEach((b, i) => {
+      if (heldDice[i]) return;
       const v = b.velocity.length();
       if (v > 5) b.velocity.scale(5 / v, b.velocity);
       const av = b.angularVelocity.length();
@@ -701,7 +720,9 @@ function createDiceScene(canvas: HTMLCanvasElement) {
   function separateDice() {
     for (let iter = 0; iter < 8; iter++) {
       for (let i = 0; i < 5; i++) {
+        if (heldDice[i]) continue;
         for (let j = i + 1; j < 5; j++) {
+          if (heldDice[j]) continue;
           const dx = diceBodies[i].position.x - diceBodies[j].position.x;
           const dz = diceBodies[i].position.z - diceBodies[j].position.z;
           const dist = Math.sqrt(dx * dx + dz * dz);
@@ -724,6 +745,7 @@ function createDiceScene(canvas: HTMLCanvasElement) {
     const el = performance.now() - settleStart;
     const timeFactor = Math.min(el / 1200, 1);
     diceBodies.forEach((body, i) => {
+      if (heldDice[i]) return;
       if (!settleTargetCannonQ[i]) return;
       const blend = timeFactor * 0.12;
       if (blend > 0.003) {
@@ -732,7 +754,8 @@ function createDiceScene(canvas: HTMLCanvasElement) {
         body.angularVelocity.scale(1 - timeFactor * 0.04, body.angularVelocity);
       }
     });
-    if (el > 1200) diceBodies.forEach(b => {
+    if (el > 1200) diceBodies.forEach((b, i) => {
+      if (heldDice[i]) return;
       b.velocity.scale(0.93, b.velocity);
       b.angularVelocity.scale(0.93, b.angularVelocity);
     });
@@ -757,9 +780,10 @@ function createDiceScene(canvas: HTMLCanvasElement) {
         body.type = CANNON.Body.KINEMATIC;
         body.velocity.setZero();
         body.angularVelocity.setZero();
-        body.quaternion.copy(settleTargetCannonQ[i]);
+        if (!heldDice[i]) body.quaternion.copy(settleTargetCannonQ[i]);
       });
       diceMeshes.forEach((m, i) => {
+        if (heldDice[i]) return;
         m.position.copy(diceBodies[i].position as unknown as THREE.Vector3);
         const tq = settleTargetCannonQ[i];
         m.quaternion.set(tq.x, tq.y, tq.z, tq.w);
@@ -791,7 +815,9 @@ function createDiceScene(canvas: HTMLCanvasElement) {
     presentStart = performance.now();
     presentFromPos = diceMeshes.map(m => m.position.clone());
     presentFromQ = diceMeshes.map(m => m.quaternion.clone());
-    presentToQ = targetVals.map(val => faceQuats[val || 1].clone());
+    presentToQ = targetVals.map((val, i) =>
+      heldDice[i] ? diceMeshes[i].quaternion.clone() : faceQuats[val || 1].clone()
+    );
     camF.p.copy(camera.position);
     camF.l.copy(controls.target);
     camTTo.p.set(...(camT[S.RESULT].p as [number, number, number]));
@@ -874,6 +900,8 @@ function createDiceScene(canvas: HTMLCanvasElement) {
   /* ── Sync & Loop ── */
   function sync() {
     for (let i = 0; i < 5; i++) {
+      // Skip held dice except during PRESENT (they need to animate to the row)
+      if (heldDice[i] && state !== S.PRESENT) continue;
       diceMeshes[i].position.copy(diceBodies[i].position as unknown as THREE.Vector3);
       if (state !== S.PRESENT && state !== S.RESULT) {
         diceMeshes[i].quaternion.copy(diceBodies[i].quaternion as unknown as THREE.Quaternion);
@@ -905,6 +933,7 @@ function createDiceScene(canvas: HTMLCanvasElement) {
     if (state !== S.IDLE && state !== S.RESULT) world.step(PHYS_STEP, dt, MAX_SUB);
     if (state === S.SETTLE) settleNudge();
     sync();
+    updateDiceOpacity();
     updateCam();
     controls.update();
     renderer.render(scene, camera);
@@ -922,13 +951,23 @@ function createDiceScene(canvas: HTMLCanvasElement) {
     },
     shake() {
       if (state === S.IDLE || state === S.RESULT) {
+        _pendingRoll = false;
         // Fill any null targetVals with random
         targetVals = targetVals.map(v => (v !== null && v >= 1 && v <= 6) ? v : Math.ceil(Math.random() * 6));
         startCollect();
       }
     },
     roll() {
-      if (state === S.SHAKE) startRoll();
+      if (state === S.SHAKE) {
+        _pendingRoll = false;
+        startRoll();
+        return true;
+      }
+      if (state === S.COLLECT) {
+        _pendingRoll = true;
+        return true;
+      }
+      return false;
     },
     onResult(cb) {
       _onResultCallback = cb;
@@ -985,7 +1024,7 @@ const DiceScene = forwardRef<DiceSceneAPI>(function DiceScene(_, ref) {
     setValues(v) { apiRef.current?.setValues(v); },
     setHeld(h) { apiRef.current?.setHeld(h); },
     shake() { apiRef.current?.shake(); },
-    roll() { apiRef.current?.roll(); },
+    roll() { return apiRef.current?.roll() ?? false; },
     onResult(cb) { apiRef.current?.onResult(cb); },
   }));
 

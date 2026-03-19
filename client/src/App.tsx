@@ -87,6 +87,9 @@ export default function App() {
         const p = env.payload as GameRolledPayload;
         dispatch({ type: 'GAME_ROLLED', dice: p.dice, held: p.held, rollCount: p.rollCount, preview: p.preview });
       }),
+      ws.on('game:pour', () => {
+        dispatch({ type: 'GAME_POUR' });
+      }),
       ws.on('game:held', (env) => {
         const p = env.payload as GameHeldPayload;
         dispatch({ type: 'GAME_HELD', held: p.held });
