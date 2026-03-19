@@ -89,12 +89,16 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
     send('game:hold', { index });
   }, [send]);
 
-  const lastHoverRef = useRef(0);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const handleHoverCategory = useCallback((category: string | null) => {
-    const now = Date.now();
-    if (category !== null && now - lastHoverRef.current < 200) return;
-    lastHoverRef.current = now;
-    send('game:hover', { category });
+    clearTimeout(hoverTimerRef.current);
+    if (category === null) {
+      hoverTimerRef.current = setTimeout(() => {
+        send('game:hover', { category: null });
+      }, 50);
+    } else {
+      send('game:hover', { category });
+    }
   }, [send]);
 
   const handleReaction = useCallback((emoji: string) => {
