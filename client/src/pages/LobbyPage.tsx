@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { GameAction } from '../hooks/useGameState';
-import type { GameState } from '../hooks/useGameState';
+import type { GameAction, GameState } from '../hooks/useGameState';
 
 interface Props {
   state: GameState;
@@ -21,18 +20,12 @@ export default function LobbyPage({ state, dispatch, send, on }: Props) {
 
   useEffect(() => {
     if (!nicknameConfirmed) return;
-    const unsub1 = on('room:created', (env: any) => {
+    const unsub = on('room:created', (env: any) => {
       const p = env.payload as { roomCode: string };
       dispatch({ type: 'SET_ROOM', roomCode: p.roomCode });
     });
-    const unsub2 = on('room:joined', () => {});
-    const unsub3 = on('room:state', (env: any) => {
-      const p = env.payload as { roomCode: string; players: any[] };
-      dispatch({ type: 'SET_ROOM', roomCode: p.roomCode });
-      dispatch({ type: 'SET_PLAYERS', players: p.players });
-    });
-    return () => { unsub1(); unsub2(); unsub3(); };
-  }, [on, send, dispatch, nicknameConfirmed]);
+    return unsub;
+  }, [on, dispatch, nicknameConfirmed]);
 
   const handleNicknameSubmit = () => {
     if (!nickname) return;

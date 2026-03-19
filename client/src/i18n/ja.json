@@ -13,7 +13,8 @@
     "noRooms": "ルームがありません",
     "players": "人",
     "waiting": "待機中",
-    "playing": "プレイ中"
+    "playing": "プレイ中",
+    "enterPassword": "ルームパスワードを入力してください"
   },
   "room": {
     "code": "ルームコード",

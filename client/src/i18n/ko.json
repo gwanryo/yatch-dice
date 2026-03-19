@@ -13,7 +13,8 @@
     "noRooms": "방이 없습니다",
     "players": "명",
     "waiting": "대기 중",
-    "playing": "게임 중"
+    "playing": "게임 중",
+    "enterPassword": "방 비밀번호를 입력하세요"
   },
   "room": {
     "code": "방 코드",

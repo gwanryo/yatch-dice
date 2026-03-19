@@ -9,8 +9,8 @@ const EMOJI_LABELS: Record<string, string> = {
 
 interface Props {
   onSend: (emoji: string) => void;
-  reactions: { playerId: string; emoji: string; ts: number }[];
-  onExpire: (ts: number) => void;
+  reactions: { playerId: string; emoji: string; id: string }[];
+  onExpire: (id: string) => void;
   players: { id: string; nickname: string }[];
 }
 
@@ -18,7 +18,7 @@ export default function ReactionBar({ onSend, reactions, onExpire, players }: Pr
   useEffect(() => {
     if (reactions.length === 0) return;
     const oldest = reactions[0];
-    const timer = setTimeout(() => onExpire(oldest.ts), 3000);
+    const timer = setTimeout(() => onExpire(oldest.id), 3000);
     return () => clearTimeout(timer);
   }, [reactions, onExpire]);
 
@@ -37,7 +37,7 @@ export default function ReactionBar({ onSend, reactions, onExpire, players }: Pr
       </div>
       <div className="absolute bottom-14 left-0 flex flex-col gap-1 pointer-events-none" aria-live="polite">
         {reactions.map(r => (
-          <div key={r.ts} className="bg-black/60 text-white text-sm px-2 py-1 rounded-lg animate-bounce">
+          <div key={r.id} className="bg-black/60 text-white text-sm px-2 py-1 rounded-lg animate-bounce">
             {nick(r.playerId)} {r.emoji}
           </div>
         ))}

@@ -30,7 +30,11 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
 
   const handleRoll = () => {
     if (rollPhase !== 'shaking') return;
-    setRollPhase('rolling');
+    const ok = sceneRef.current?.roll();
+    if (ok) {
+      setRollPhase('rolling');
+      send('game:pour');
+    }
   };
 
   // Trigger animation when dice values arrive
@@ -41,28 +45,21 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
         api.setHeld(state.held);
         api.setValues(state.dice);
         api.shake();
-        if (isMyTurn) {
-          // Active player: show shaking, wait for Roll button click
-          setRollPhase('shaking');
-        } else {
-          // Spectator: auto shake then auto roll after delay
-          setRollPhase('shaking');
-          setTimeout(() => {
-            api.roll();
-            setRollPhase('rolling');
-          }, 800);
-        }
+        setRollPhase('shaking');
       }
     }
     prevRollCountRef.current = state.rollCount;
   }, [state.rollCount, state.dice, state.held, isMyTurn]);
 
-  // Handle roll phase: when user clicks Roll button -> tell scene to roll
+  // Remote players: roll when active player clicks Roll (game:pour)
+  const prevPourRef = useRef(state.pourCount);
   useEffect(() => {
-    if (rollPhase === 'rolling') {
+    if (state.pourCount > prevPourRef.current && !isMyTurn) {
       sceneRef.current?.roll();
+      setRollPhase('rolling');
     }
-  }, [rollPhase]);
+    prevPourRef.current = state.pourCount;
+  }, [state.pourCount, isMyTurn]);
 
   // Sync held state to 3D scene whenever it changes (e.g. from game:held)
   useEffect(() => {
@@ -79,11 +76,8 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
     setRollPhase('settled');
   }, []);
 
-  // Register onResult callback
   useEffect(() => {
-    sceneRef.current?.onResult(() => {
-      handleSettled();
-    });
+    sceneRef.current?.onResult(handleSettled);
   }, [handleSettled]);
 
   const handleScore = (category: Category) => {
