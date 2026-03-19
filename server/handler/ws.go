@@ -1,8 +1,13 @@
 package handler
 
 import (
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
-	"log"
+	"log/slog"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -18,21 +23,68 @@ import (
 	"yacht-dice-server/room"
 )
 
-// rateLimiter tracks per-connection message rates.
-type rateLimiter struct {
-	mu        sync.Mutex
-	tokens    int
-	maxTokens int
-	lastTime  time.Time
-	rate      time.Duration // refill one token per this duration
+// Named constants for magic numbers
+const (
+	maxTokens        = 30
+	tokenRefillRate  = 100 * time.Millisecond
+	hoverMinInterval = 200 * time.Millisecond
+
+	ipMaxTokens       = 10
+	ipTokenRefillRate = 6 * time.Second // 10 tokens refilled over 60s = 1 per 6s
+	ipCleanupInterval = 5 * time.Minute
+	ipLimiterExpiry   = 2 * time.Minute
+)
+
+// signingKey is generated at server start for HMAC-signing player IDs.
+var signingKey []byte
+
+func init() {
+	signingKey = make([]byte, 32)
+	if _, err := rand.Read(signingKey); err != nil {
+		panic("failed to generate signing key: " + err.Error())
+	}
 }
 
-func newRateLimiter(maxTokens int, rate time.Duration) *rateLimiter {
+// signPlayerID returns "playerId:hmac_hex".
+func signPlayerID(playerID string) string {
+	mac := hmac.New(sha256.New, signingKey)
+	mac.Write([]byte(playerID))
+	sig := hex.EncodeToString(mac.Sum(nil))
+	return playerID + ":" + sig
+}
+
+// verifyPlayerToken checks that "playerId:hmac_hex" is valid.
+func verifyPlayerToken(token string) (string, bool) {
+	idx := strings.LastIndex(token, ":")
+	if idx < 0 {
+		return "", false
+	}
+	playerID := token[:idx]
+	sigHex := token[idx+1:]
+	mac := hmac.New(sha256.New, signingKey)
+	mac.Write([]byte(playerID))
+	expected := hex.EncodeToString(mac.Sum(nil))
+	if !hmac.Equal([]byte(sigHex), []byte(expected)) {
+		return "", false
+	}
+	return playerID, true
+}
+
+// rateLimiter is a simple token-bucket rate limiter.
+type rateLimiter struct {
+	mu       sync.Mutex
+	tokens   int
+	max      int
+	refill   time.Duration
+	lastTime time.Time
+}
+
+func newRateLimiter(max int, refill time.Duration) *rateLimiter {
 	return &rateLimiter{
-		tokens:    maxTokens,
-		maxTokens: maxTokens,
-		lastTime:  time.Now(),
-		rate:      rate,
+		tokens:   max,
+		max:      max,
+		refill:   refill,
+		lastTime: time.Now(),
 	}
 }
 
@@ -41,33 +93,103 @@ func (rl *rateLimiter) Allow() bool {
 	defer rl.mu.Unlock()
 	now := time.Now()
 	elapsed := now.Sub(rl.lastTime)
-	refill := int(elapsed / rl.rate)
-	if refill > 0 {
-		rl.tokens = min(rl.maxTokens, rl.tokens+refill)
-		rl.lastTime = now
+	add := int(elapsed / rl.refill)
+	if add > 0 {
+		rl.tokens += add
+		if rl.tokens > rl.max {
+			rl.tokens = rl.max
+		}
+		rl.lastTime = rl.lastTime.Add(time.Duration(add) * rl.refill)
 	}
-	if rl.tokens > 0 {
-		rl.tokens--
-		return true
+	if rl.tokens <= 0 {
+		return false
 	}
-	return false
+	rl.tokens--
+	return true
 }
 
-// hoverThrottle tracks the last hover time per player.
+// hoverThrottle limits hover events by minimum interval.
 type hoverThrottle struct {
-	mu   sync.Mutex
-	last time.Time
+	mu       sync.Mutex
+	lastTime time.Time
+	interval time.Duration
+}
+
+func newHoverThrottle(interval time.Duration) *hoverThrottle {
+	return &hoverThrottle{interval: interval}
 }
 
 func (ht *hoverThrottle) Allow() bool {
 	ht.mu.Lock()
 	defer ht.mu.Unlock()
 	now := time.Now()
-	if now.Sub(ht.last) < 200*time.Millisecond {
+	if now.Sub(ht.lastTime) < ht.interval {
 		return false
 	}
-	ht.last = now
+	ht.lastTime = now
 	return true
+}
+
+// Per-IP connection rate limiting
+var (
+	ipLimiterMu sync.Mutex
+	ipLimiters  = make(map[string]*ipLimiterEntry)
+)
+
+type ipLimiterEntry struct {
+	limiter  *rateLimiter
+	lastSeen time.Time
+}
+
+func init() {
+	go cleanupIPLimiters()
+}
+
+func cleanupIPLimiters() {
+	ticker := time.NewTicker(ipCleanupInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		ipLimiterMu.Lock()
+		now := time.Now()
+		for ip, entry := range ipLimiters {
+			if now.Sub(entry.lastSeen) > ipLimiterExpiry {
+				delete(ipLimiters, ip)
+			}
+		}
+		ipLimiterMu.Unlock()
+	}
+}
+
+func allowIP(ip string) bool {
+	ipLimiterMu.Lock()
+	defer ipLimiterMu.Unlock()
+	entry, ok := ipLimiters[ip]
+	if !ok {
+		entry = &ipLimiterEntry{
+			limiter:  newRateLimiter(ipMaxTokens, ipTokenRefillRate),
+			lastSeen: time.Now(),
+		}
+		ipLimiters[ip] = entry
+	}
+	entry.lastSeen = time.Now()
+	return entry.limiter.Allow()
+}
+
+func extractClientIP(r *http.Request) string {
+	// Check X-Forwarded-For first (reverse proxy)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.SplitN(xff, ",", 2)
+		ip := strings.TrimSpace(parts[0])
+		if ip != "" {
+			return ip
+		}
+	}
+	// Fall back to RemoteAddr
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 var upgrader = websocket.Upgrader{
@@ -76,12 +198,9 @@ var upgrader = websocket.Upgrader{
 		if origin == "" {
 			return true
 		}
-		// Allow localhost for development
 		if strings.HasPrefix(origin, "http://localhost") || strings.HasPrefix(origin, "https://localhost") {
 			return true
 		}
-		// In production, restrict to your domain(s) by setting AllowedOrigins
-		// For now, allow all origins (override in production)
 		return true
 	},
 }
@@ -95,9 +214,15 @@ func NewWSHandler(h *hub.Hub) *WSHandler {
 }
 
 func (wh *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	clientIP := extractClientIP(r)
+	if !allowIP(clientIP) {
+		http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
+		return
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("upgrade error: %v", err)
+		slog.Error("WebSocket upgrade failed", "error", err, "ip", clientIP)
 		return
 	}
 	defer conn.Close()
@@ -110,13 +235,19 @@ func (wh *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		nickname = "Player_" + uuid.New().String()[:4]
 	}
 
-	existingID := r.URL.Query().Get("playerId")
+	// Check for reconnection via signed token
+	existingToken := r.URL.Query().Get("token")
 	var p *player.Player
-	if existingID != "" {
-		p = wh.hub.GetPlayer(existingID)
+	if existingToken != "" {
+		if playerID, valid := verifyPlayerToken(existingToken); valid {
+			p = wh.hub.GetPlayer(playerID)
+		} else {
+			slog.Warn("Invalid reconnection token", "ip", clientIP)
+		}
 	}
 	if p != nil {
 		p.SetConn(conn)
+		slog.Info("Player reconnected", "playerId", p.ID, "ip", clientIP)
 		rm := wh.hub.PlayerRoom(p.ID)
 		if rm != nil {
 			rm.HandleReconnect(p.ID)
@@ -128,29 +259,38 @@ func (wh *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else {
 		p = player.New(uuid.New().String(), nickname, conn)
 		wh.hub.RegisterPlayer(p)
+		slog.Info("New player connected", "playerId", p.ID, "nickname", nickname, "ip", clientIP)
 	}
 
-	data, _ := message.New("connected", message.ConnectedPayload{PlayerID: p.ID})
+	token := signPlayerID(p.ID)
+	data, _ := message.New("connected", message.ConnectedPayload{PlayerID: p.ID, Token: token})
 	p.Send(data)
 
-	rl := newRateLimiter(30, 100*time.Millisecond) // 30 tokens, refill 1 per 100ms = ~10 msg/s
-	ht := &hoverThrottle{}
+	limiter := newRateLimiter(maxTokens, tokenRefillRate)
+	hover := newHoverThrottle(hoverMinInterval)
 
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("read error (player %s): %v", p.ID, err)
+			slog.Error("WebSocket read error", "playerId", p.ID, "error", err)
 			wh.handleDisconnect(p)
 			return
 		}
-		if !rl.Allow() {
-			continue // silently drop rate-limited messages
-		}
 		env, err := message.Parse(msg)
 		if err != nil {
+			slog.Warn("Message parse error", "playerId", p.ID, "error", err)
 			continue
 		}
-		wh.handleMessageWithThrottle(p, env, ht)
+		if env.Type == "game:hover" {
+			if !hover.Allow() {
+				continue
+			}
+		} else {
+			if !limiter.Allow() {
+				continue
+			}
+		}
+		wh.handleMessage(p, env)
 	}
 }
 
@@ -167,7 +307,6 @@ func (wh *WSHandler) handleDisconnect(p *player.Player) {
 
 	if rm.Status() == "playing" {
 		if rm.PlayerCount() <= 2 {
-			// End game BEFORE removing player — RemovePlayer destroys the engine
 			wh.endGame(rm)
 			rm.RemovePlayer(p.ID, func() { wh.hub.RemoveRoom(rm.Code) })
 			remData, _ := message.New("player:removed", message.PlayerEventPayload{PlayerID: p.ID})
@@ -193,13 +332,6 @@ func (wh *WSHandler) handleDisconnect(p *player.Player) {
 		rm.Broadcast(leftData)
 		rm.BroadcastState()
 	}
-}
-
-func (wh *WSHandler) handleMessageWithThrottle(p *player.Player, env message.Envelope, ht *hoverThrottle) {
-	if env.Type == "game:hover" && !ht.Allow() {
-		return
-	}
-	wh.handleMessage(p, env)
 }
 
 func (wh *WSHandler) handleMessage(p *player.Player, env message.Envelope) {
@@ -362,7 +494,6 @@ func (wh *WSHandler) handleHover(p *player.Player, payload json.RawMessage) {
 	}
 	var req message.GameHoverPayload
 	if err := json.Unmarshal(payload, &req); err != nil {
-		log.Printf("hover unmarshal error (player %s): %v", p.ID, err)
 		return
 	}
 	currentPlayer, _, rollCount, ok := rm.TurnInfo()
@@ -381,10 +512,6 @@ func (wh *WSHandler) handleScore(p *player.Player, payload json.RawMessage) {
 	var req message.GameScorePayload
 	if err := json.Unmarshal(payload, &req); err != nil {
 		wh.sendError(p, message.ErrInvalidPayload, "Invalid payload")
-		return
-	}
-	if !message.ValidCategory(req.Category) {
-		wh.sendError(p, message.ErrInvalidPayload, "Invalid category")
 		return
 	}
 	result, err := rm.Score(p.ID, req.Category)
@@ -469,9 +596,6 @@ func (wh *WSHandler) handleReaction(p *player.Player, payload json.RawMessage) {
 	if err := json.Unmarshal(payload, &req); err != nil {
 		wh.sendError(p, message.ErrInvalidPayload, "Invalid payload")
 		return
-	}
-	if !message.ValidEmojis[req.Emoji] {
-		return // silently drop invalid emoji
 	}
 	data, _ := message.New("reaction:show", message.ReactionShowPayload{PlayerID: p.ID, Emoji: req.Emoji})
 	rm.Broadcast(data)

@@ -1,4 +1,5 @@
-import { useState, useEffect, memo } from 'react';
+import { useRef, useEffect, memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   dice: number[];
@@ -22,7 +23,7 @@ function DiceFace({ value, size = 44 }: { value: number; size?: number }) {
   const pips = PIP_LAYOUTS[value] || [];
   const pipR = size * 0.09;
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100">
+    <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden="true">
       {pips.map(([cx, cy], j) => (
         <circle key={j} cx={cx} cy={cy} r={pipR / (size / 100)} fill="currentColor" />
       ))}
@@ -31,14 +32,14 @@ function DiceFace({ value, size = 44 }: { value: number; size?: number }) {
 }
 
 export default memo(function DiceTray({ dice, held, rollCount, isMyTurn, settled, onHold }: Props) {
+  const { t } = useTranslation();
   const canInteract = isMyTurn && rollCount > 0 && settled;
-  const [justHeld, setJustHeld] = useState<boolean[]>([false, false, false, false, false]);
-  const [prevHeld, setPrevHeld] = useState<boolean[]>([false, false, false, false, false]);
+  const prevHeldRef = useRef<boolean[]>([false, false, false, false, false]);
+  const justHeld = held.map((h, i) => h && !prevHeldRef.current[i]);
 
   useEffect(() => {
-    setJustHeld(held.map((h, i) => h && !prevHeld[i]));
-    setPrevHeld(held);
-  }, [held]); // eslint-disable-line react-hooks/exhaustive-deps -- prevHeld is intentionally captured at effect time
+    prevHeldRef.current = held;
+  }, [held]);
 
   if (rollCount === 0 || dice.length !== 5) return null;
 
@@ -61,10 +62,11 @@ export default memo(function DiceTray({ dice, held, rollCount, isMyTurn, settled
             onClick={() => canInteract && onHold(i)}
             disabled={!canInteract}
             aria-pressed={isHeld}
-            aria-label={`Dice ${i + 1}: ${d}${isHeld ? ' (held)' : ''}`}
+            aria-label={t('aria.diceLabel', { index: i + 1, value: d }) + (isHeld ? t('aria.diceHeld') : '')}
             className={`
               relative w-12 h-12 rounded-lg flex items-center justify-center
-              transition-all duration-300
+              transition-[transform,background-color,color,opacity,border-color,box-shadow] duration-300
+              focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1 focus-visible:ring-offset-black
               ${isHeld
                 ? 'text-amber-900 shadow-lg scale-105'
                 : settled
@@ -84,7 +86,7 @@ export default memo(function DiceTray({ dice, held, rollCount, isMyTurn, settled
             {(settled || isHeld) && <DiceFace value={d} size={44} />}
             {isHeld && (
               <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center shadow-sm">
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
@@ -94,17 +96,6 @@ export default memo(function DiceTray({ dice, held, rollCount, isMyTurn, settled
         );
       })}
 
-      <style>{`
-        @keyframes dice-lock {
-          0% { transform: scale(1); }
-          40% { transform: scale(1.2); }
-          70% { transform: scale(0.95); }
-          100% { transform: scale(1.05); }
-        }
-        .animate-dice-lock {
-          animation: dice-lock 0.4s ease-out;
-        }
-      `}</style>
     </div>
   );
 });

@@ -2,12 +2,13 @@
   "app": { "title": "Yacht Dice" },
   "lobby": {
     "nickname": "ニックネーム",
-    "nicknamePlaceholder": "ニックネームを入力",
+    "nicknamePlaceholder": "ニックネームを入力…",
     "createRoom": "ルーム作成",
     "joinByCode": "コードで参加",
-    "codePlaceholder": "ルームコード",
-    "password": "パスワード",
-    "passwordPlaceholder": "パスワード（任意）",
+    "codePlaceholder": "ABCDEF…",
+    "password": "パスワード…",
+    "passwordPlaceholder": "パスワード（任意）…",
+    "leaveConfirm": "本当にルームを退出しますか？",
     "join": "参加",
     "refresh": "更新",
     "noRooms": "ルームがありません",
@@ -23,7 +24,7 @@
     "start": "ゲーム開始",
     "leave": "退出",
     "host": "ホスト",
-    "waitingForPlayers": "プレイヤーを待っています...",
+    "waitingForPlayers": "プレイヤーを待っています\u2026",
     "allReady": "全員準備完了"
   },
   "game": {
@@ -34,7 +35,7 @@
     "rollDice": "Roll!",
     "selectCategory": "カテゴリを選択してください",
     "yourTurn": "あなたのターン",
-    "waitingTurn": "のターン",
+    "waitingTurn": "{{name}}のターン",
     "score": "スコア"
   },
   "categories": {
@@ -46,8 +47,15 @@
   },
   "result": {
     "title": "ゲーム結果",
-    "rank": "位",
+    "rankLabel": "{{rank}}位",
     "rematch": "もう一度",
     "backToLobby": "ロビーへ"
+  },
+  "aria": {
+    "diceLabel": "サイコロ {{index}}: {{value}}",
+    "diceHeld": "（ホールド）",
+    "sendReaction": "{{name}} を送信",
+    "copyRoomCode": "ルームコードをコピー",
+    "diceScene": "3Dサイコロゲームシーン"
   }
 }

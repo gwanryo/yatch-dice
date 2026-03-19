@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, memo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const EMOJIS = ['\u{1F44D}', '\u{1F44F}', '\u{1F602}', '\u{1F631}', '\u{1F525}', '\u{1F480}', '\u{1F389}', '\u{1F62D}'];
 
@@ -10,6 +11,7 @@ const EMOJI_LABELS: Record<string, string> = {
 const MAX_FLOATS = 8;
 const FLOAT_DURATION = 2500;
 const BADGE_DURATION = 5000;
+const MAX_PROCESSED_IDS = 200;
 
 interface Props {
   onSend: (emoji: string) => void;
@@ -26,6 +28,7 @@ interface FloatingEmoji {
 }
 
 export default memo(function ReactionBar({ onSend, reactions, onExpire, players }: Props) {
+  const { t } = useTranslation();
   const activeTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [floats, setFloats] = useState<FloatingEmoji[]>([]);
   const [badges, setBadges] = useState<Record<string, number>>({});
@@ -39,6 +42,12 @@ export default memo(function ReactionBar({ onSend, reactions, onExpire, players 
     for (const r of reactions) {
       if (processedIds.current.has(r.id)) continue;
       processedIds.current.add(r.id);
+
+      // Trim processedIds to prevent unbounded growth
+      if (processedIds.current.size > MAX_PROCESSED_IDS) {
+        const entries = [...processedIds.current];
+        processedIds.current = new Set(entries.slice(-MAX_PROCESSED_IDS / 2));
+      }
 
       // Add floating emoji
       const fe: FloatingEmoji = {
@@ -108,7 +117,7 @@ export default memo(function ReactionBar({ onSend, reactions, onExpire, players 
   return (
     <div className="relative">
       {/* Floating emojis zone */}
-      <div className="absolute bottom-14 left-0 right-0 h-48 pointer-events-none overflow-hidden" aria-live="polite">
+      <div className="absolute bottom-14 left-0 right-0 h-48 pointer-events-none overflow-hidden" aria-hidden="true">
         {floats.map(f => (
           <div
             key={f.id}
@@ -116,7 +125,7 @@ export default memo(function ReactionBar({ onSend, reactions, onExpire, players 
             style={{ left: `${f.x}%`, bottom: 0 }}
           >
             <span className="text-4xl drop-shadow-lg">{f.emoji}</span>
-            <span className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 text-[9px] text-white/60 bg-black/50 px-1.5 py-px rounded whitespace-nowrap">
+            <span className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 text-[9px] text-white/60 bg-black/50 px-1.5 py-px rounded whitespace-nowrap max-w-[6rem] truncate">
               {f.nickname}
             </span>
           </div>
@@ -129,10 +138,10 @@ export default memo(function ReactionBar({ onSend, reactions, onExpire, players 
           <button
             key={e}
             onClick={() => onSend(e)}
-            aria-label={`Send ${EMOJI_LABELS[e] ?? 'reaction'}`}
+            aria-label={t('aria.sendReaction', { name: EMOJI_LABELS[e] ?? 'reaction' })}
             className="relative w-10 h-10 text-xl rounded-full bg-white/8 border-2 border-transparent
               hover:bg-white/15 hover:border-white/20 hover:scale-115
-              active:scale-90 transition-all duration-150
+              active:scale-90 transition-[transform,background-color,border-color] duration-150
               focus-visible:ring-2 focus-visible:ring-white"
           >
             {e}
@@ -145,26 +154,6 @@ export default memo(function ReactionBar({ onSend, reactions, onExpire, players 
         ))}
       </div>
 
-      <style>{`
-        @keyframes reaction-float {
-          0% { opacity: 1; transform: translateY(0) scale(0.5); }
-          15% { transform: translateY(-10px) scale(1.1); }
-          30% { transform: translateY(-30px) scale(1); }
-          70% { opacity: 1; }
-          100% { opacity: 0; transform: translateY(-160px) scale(1.2); }
-        }
-        .animate-reaction-float {
-          animation: reaction-float ${FLOAT_DURATION}ms ease-out forwards;
-        }
-        @keyframes badge-pop {
-          0% { transform: scale(0); }
-          60% { transform: scale(1.3); }
-          100% { transform: scale(1); }
-        }
-        .animate-badge-pop {
-          animation: badge-pop 0.3s ease-out;
-        }
-      `}</style>
     </div>
   );
 });

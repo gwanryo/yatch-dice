@@ -7,25 +7,32 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"yacht-dice-server/game"
 	"yacht-dice-server/message"
 	"yacht-dice-server/player"
 )
 
-const MaxPlayers = 4
+const (
+	MaxPlayers        = 4
+	emptyRoomTimeout  = 30 * time.Second
+	disconnectTimeout = 60 * time.Second
+	rematchTimeout    = 30 * time.Second
+)
 
 type Room struct {
-	Code     string
-	password string
-	mu       sync.RWMutex
-	players  []*player.Player
-	hostID   string
-	ready    map[string]bool
-	engine   *game.Engine
-	status   string
-	cleanup  *time.Timer
-	disconn  map[string]*time.Timer
-	rematch  map[string]bool
+	Code         string
+	passwordHash []byte // bcrypt hash; nil when no password
+	mu           sync.RWMutex
+	players      []*player.Player
+	hostID       string
+	ready        map[string]bool
+	engine       *game.Engine
+	status       string
+	cleanup      *time.Timer
+	disconn      map[string]*time.Timer
+	rematch      map[string]bool
 }
 
 func GenerateCode() string {
@@ -39,13 +46,17 @@ func GenerateCode() string {
 }
 
 func New(code, password string) *Room {
+	var hash []byte
+	if password != "" {
+		hash, _ = bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	}
 	return &Room{
-		Code:     code,
-		password: password,
-		ready:    make(map[string]bool),
-		status:   "waiting",
-		disconn:  make(map[string]*time.Timer),
-		rematch:  make(map[string]bool),
+		Code:         code,
+		passwordHash: hash,
+		ready:        make(map[string]bool),
+		status:       "waiting",
+		disconn:      make(map[string]*time.Timer),
+		rematch:      make(map[string]bool),
 	}
 }
 
@@ -62,11 +73,11 @@ func (r *Room) PlayerCount() int {
 }
 
 func (r *Room) HasPassword() bool {
-	return r.password != ""
+	return len(r.passwordHash) > 0
 }
 
 func (r *Room) CheckPassword(pw string) bool {
-	return r.password == pw
+	return bcrypt.CompareHashAndPassword(r.passwordHash, []byte(pw)) == nil
 }
 
 func (r *Room) AddPlayer(p *player.Player) error {
@@ -120,7 +131,7 @@ func (r *Room) RemovePlayer(playerID string, onEmpty func()) {
 		}
 	}
 	if len(r.players) == 0 {
-		r.cleanup = time.AfterFunc(30*time.Second, onEmpty)
+		r.cleanup = time.AfterFunc(emptyRoomTimeout, onEmpty)
 	}
 }
 
@@ -253,17 +264,6 @@ func (r *Room) EndGame() {
 func (r *Room) Rematch(playerID string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	// Verify player is in the room
-	found := false
-	for _, p := range r.players {
-		if p.ID == playerID {
-			found = true
-			break
-		}
-	}
-	if !found {
-		return false
-	}
 	r.rematch[playerID] = true
 	if len(r.rematch) >= len(r.players) {
 		r.status = "waiting"
@@ -292,7 +292,7 @@ func (r *Room) StartRematchTimer(onTimeout func()) {
 	if r.cleanup != nil {
 		r.cleanup.Stop()
 	}
-	r.cleanup = time.AfterFunc(30*time.Second, onTimeout)
+	r.cleanup = time.AfterFunc(rematchTimeout, onTimeout)
 }
 
 func (r *Room) CancelRematchTimer() {
@@ -310,7 +310,7 @@ func (r *Room) HandleDisconnect(playerID string, onTimeout func()) {
 	if timer, ok := r.disconn[playerID]; ok {
 		timer.Stop()
 	}
-	r.disconn[playerID] = time.AfterFunc(60*time.Second, onTimeout)
+	r.disconn[playerID] = time.AfterFunc(disconnectTimeout, onTimeout)
 }
 
 func (r *Room) HandleReconnect(playerID string) {
@@ -388,7 +388,7 @@ func (r *Room) ListItem() message.RoomListItem {
 	return message.RoomListItem{
 		Code:        r.Code,
 		PlayerCount: len(r.players),
-		HasPassword: r.password != "",
+		HasPassword: len(r.passwordHash) > 0,
 		Status:      r.status,
 	}
 }
@@ -402,4 +402,3 @@ func (r *Room) NicknameMap() map[string]string {
 	}
 	return m
 }
-
