@@ -196,3 +196,137 @@ func TestPreviewExcludesScored(t *testing.T) {
 		t.Errorf("preview categories = %d, want 11", len(preview))
 	}
 }
+
+func TestRemoveCurrentPlayer(t *testing.T) {
+	e := NewEngine([]string{"p1", "p2", "p3"})
+	e.Roll("p1")
+	// Remove current player p1
+	e.RemovePlayer("p1")
+	// Should advance to p2 with reset state
+	if e.CurrentPlayer() != "p2" {
+		t.Errorf("after removing current player, current = %s, want p2", e.CurrentPlayer())
+	}
+	if e.RollCount() != 0 {
+		t.Errorf("rollCount should be 0 after removing current player, got %d", e.RollCount())
+	}
+}
+
+func TestRemovePlayerBeforeCurrent(t *testing.T) {
+	e := NewEngine([]string{"p1", "p2", "p3"})
+	// Advance to p2's turn
+	e.Roll("p1")
+	e.Score("p1", "choice")
+	if e.CurrentPlayer() != "p2" {
+		t.Fatalf("expected p2's turn, got %s", e.CurrentPlayer())
+	}
+	// Remove p1 (before current)
+	e.RemovePlayer("p1")
+	// p2 should still be current
+	if e.CurrentPlayer() != "p2" {
+		t.Errorf("after removing p1, current = %s, want p2", e.CurrentPlayer())
+	}
+}
+
+func TestRemovePlayerAfterCurrent(t *testing.T) {
+	e := NewEngine([]string{"p1", "p2", "p3"})
+	// p1's turn
+	if e.CurrentPlayer() != "p1" {
+		t.Fatalf("expected p1's turn, got %s", e.CurrentPlayer())
+	}
+	// Remove p3 (after current)
+	e.RemovePlayer("p3")
+	// p1 should still be current
+	if e.CurrentPlayer() != "p1" {
+		t.Errorf("after removing p3, current = %s, want p1", e.CurrentPlayer())
+	}
+	if len(e.PlayerOrder()) != 2 {
+		t.Errorf("player count = %d, want 2", len(e.PlayerOrder()))
+	}
+}
+
+func TestRemoveLastPlayerWrapsTurn(t *testing.T) {
+	e := NewEngine([]string{"p1", "p2"})
+	// Advance to p2's turn
+	e.Roll("p1")
+	e.Score("p1", "choice")
+	if e.CurrentPlayer() != "p2" {
+		t.Fatalf("expected p2's turn, got %s", e.CurrentPlayer())
+	}
+	// Remove p2 (current and last in order) — should wrap to p1 and advance round
+	e.RemovePlayer("p2")
+	if e.CurrentPlayer() != "p1" {
+		t.Errorf("after removing last player in order, current = %s, want p1", e.CurrentPlayer())
+	}
+	if e.Round() != 2 {
+		t.Errorf("round = %d, want 2 after wrapping", e.Round())
+	}
+}
+
+func TestRankings(t *testing.T) {
+	e := NewEngine([]string{"p1", "p2"})
+	// Play one round so both have scores
+	e.Roll("p1")
+	e.Score("p1", "choice")
+	e.Roll("p2")
+	e.Score("p2", "choice")
+
+	rankings := e.Rankings()
+	if len(rankings) != 2 {
+		t.Errorf("rankings count = %d, want 2", len(rankings))
+	}
+	// Rankings should be sorted by score descending
+	if rankings[0].Score < rankings[1].Score {
+		t.Error("rankings should be sorted descending by score")
+	}
+	if rankings[0].Rank != 1 || rankings[1].Rank != 2 {
+		t.Error("ranks should be 1, 2")
+	}
+}
+
+func TestScoreBeforeRoll(t *testing.T) {
+	e := NewEngine([]string{"p1", "p2"})
+	_, err := e.Score("p1", "choice")
+	if err == nil {
+		t.Error("expected error when scoring before rolling")
+	}
+}
+
+func TestScoreInvalidCategory(t *testing.T) {
+	e := NewEngine([]string{"p1", "p2"})
+	e.Roll("p1")
+	_, err := e.Score("p1", "notACategory")
+	if err == nil {
+		t.Error("expected error for invalid category")
+	}
+}
+
+func TestFullGameFourPlayers(t *testing.T) {
+	players := []string{"p1", "p2", "p3", "p4"}
+	e := NewEngine(players)
+	cats := AllCategories()
+	for round := 0; round < len(cats); round++ {
+		for _, pid := range players {
+			if e.IsFinished() {
+				t.Fatalf("game finished early at round %d, player %s", round, pid)
+			}
+			if e.CurrentPlayer() != pid {
+				t.Fatalf("round %d: expected %s's turn, got %s", round, pid, e.CurrentPlayer())
+			}
+			_, err := e.Roll(pid)
+			if err != nil {
+				t.Fatalf("round %d, %s roll: %v", round, pid, err)
+			}
+			_, err = e.Score(pid, cats[round])
+			if err != nil {
+				t.Fatalf("round %d, %s score %s: %v", round, pid, cats[round], err)
+			}
+		}
+	}
+	if !e.IsFinished() {
+		t.Error("game should be finished after all rounds with 4 players")
+	}
+	rankings := e.Rankings()
+	if len(rankings) != 4 {
+		t.Errorf("rankings count = %d, want 4", len(rankings))
+	}
+}

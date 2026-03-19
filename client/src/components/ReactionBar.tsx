@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, memo } from 'react';
 
 const EMOJIS = ['\u{1F44D}', '\u{1F44F}', '\u{1F602}', '\u{1F631}', '\u{1F525}', '\u{1F480}', '\u{1F389}', '\u{1F62D}'];
 
@@ -14,13 +14,38 @@ interface Props {
   players: { id: string; nickname: string }[];
 }
 
-export default function ReactionBar({ onSend, reactions, onExpire, players }: Props) {
+export default memo(function ReactionBar({ onSend, reactions, onExpire, players }: Props) {
+  const activeTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
   useEffect(() => {
-    if (reactions.length === 0) return;
-    const oldest = reactions[0];
-    const timer = setTimeout(() => onExpire(oldest.id), 3000);
-    return () => clearTimeout(timer);
+    // Set timers for new reactions
+    for (const r of reactions) {
+      if (activeTimers.current.has(r.id)) continue;
+      const timer = setTimeout(() => {
+        activeTimers.current.delete(r.id);
+        onExpire(r.id);
+      }, 3000);
+      activeTimers.current.set(r.id, timer);
+    }
+    // Clean up timers for removed reactions
+    for (const [id, timer] of activeTimers.current) {
+      if (!reactions.some(r => r.id === id)) {
+        clearTimeout(timer);
+        activeTimers.current.delete(id);
+      }
+    }
   }, [reactions, onExpire]);
+
+  // Clean up all timers on unmount
+  useEffect(() => {
+    const timers = activeTimers.current;
+    return () => {
+      for (const timer of timers.values()) {
+        clearTimeout(timer);
+      }
+      timers.clear();
+    };
+  }, []);
 
   const nick = (id: string) => players.find(p => p.id === id)?.nickname ?? '?';
 
@@ -44,4 +69,4 @@ export default function ReactionBar({ onSend, reactions, onExpire, players }: Pr
       </div>
     </div>
   );
-}
+});

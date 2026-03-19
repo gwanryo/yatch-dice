@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UPPER_CATEGORIES, LOWER_CATEGORIES, type Category, type PlayerInfo } from '../types/game';
 
@@ -23,7 +24,7 @@ function total(playerScores: Record<string, number>): number {
   return sum + bonus;
 }
 
-export default function ScoreBoard({
+export default memo(function ScoreBoard({
   players, scores, currentPlayer, myId, rollCount,
   preview, hoveredCategory, onSelectCategory, onHoverCategory,
 }: Props) {
@@ -42,6 +43,9 @@ export default function ScoreBoard({
       <tr
         key={cat}
         onClick={() => canSelect && onSelectCategory?.(cat)}
+        role={canSelect ? 'button' : undefined}
+        tabIndex={canSelect ? 0 : undefined}
+        onKeyDown={(e) => { if (canSelect && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onSelectCategory?.(cat); } }}
         className={`transition-colors ${
           isMyHover ? 'bg-yellow-500/20' :
           isOtherHover ? 'bg-blue-500/10' :
@@ -118,4 +122,4 @@ export default function ScoreBoard({
       </table>
     </div>
   );
-}
+});

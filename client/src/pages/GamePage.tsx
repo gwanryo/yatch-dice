@@ -80,22 +80,30 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
     sceneRef.current?.onResult(handleSettled);
   }, [handleSettled]);
 
-  const handleScore = (category: Category) => {
+  const handleScore = useCallback((category: Category) => {
     send('game:score', { category });
     setRollPhase('idle');
-  };
+  }, [send]);
 
-  const handleHold = (index: number) => {
+  const handleHold = useCallback((index: number) => {
     send('game:hold', { index });
-  };
+  }, [send]);
 
-  const handleHoverCategory = (category: string | null) => {
+  const lastHoverRef = useRef(0);
+  const handleHoverCategory = useCallback((category: string | null) => {
+    const now = Date.now();
+    if (category !== null && now - lastHoverRef.current < 200) return;
+    lastHoverRef.current = now;
     send('game:hover', { category });
-  };
+  }, [send]);
 
-  const handleReaction = (emoji: string) => {
+  const handleReaction = useCallback((emoji: string) => {
     send('reaction:send', { emoji });
-  };
+  }, [send]);
+
+  const handleReactionExpire = useCallback((id: string) => {
+    dispatch({ type: 'CLEAR_REACTION', id });
+  }, [dispatch]);
 
   const currentNick = state.players.find(p => p.id === state.currentPlayer)?.nickname ?? '';
 
@@ -173,7 +181,7 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
           <ReactionBar
             onSend={handleReaction}
             reactions={state.reactions}
-            onExpire={(id) => dispatch({ type: 'CLEAR_REACTION', id })}
+            onExpire={handleReactionExpire}
             players={state.players}
           />
         </div>

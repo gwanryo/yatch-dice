@@ -120,7 +120,7 @@ export default function App() {
       }),
       ws.on('player:left', (env) => {
         const p = env.payload as { playerId: string };
-        dispatch({ type: 'SET_PLAYERS', players: state.players.filter(pl => pl.id !== p.playerId) });
+        dispatch({ type: 'REMOVE_PLAYER', playerId: p.playerId });
       }),
       ws.on('error', (env) => {
         const p = env.payload as { message: string };
@@ -129,7 +129,7 @@ export default function App() {
       }),
     ];
     return () => unsubs.forEach(u => u());
-  }, [ws, dispatch, state.players]);
+  }, [ws.on, dispatch]);
 
   const page = (() => {
     switch (state.phase) {

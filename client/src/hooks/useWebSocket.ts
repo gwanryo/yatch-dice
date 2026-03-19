@@ -19,6 +19,13 @@ export function useWebSocket(nickname: string) {
   useEffect(() => { playerIdRef.current = playerId; }, [playerId]);
 
   const connect = useCallback(() => {
+    // Close existing connection before creating a new one
+    if (wsRef.current) {
+      wsRef.current.onclose = null;
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     const params = new URLSearchParams({ nickname: nicknameRef.current });
@@ -28,7 +35,15 @@ export function useWebSocket(nickname: string) {
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
+    // Connection timeout: if not open within 10s, treat as failed
+    const connectTimeout = setTimeout(() => {
+      if (ws.readyState !== WebSocket.OPEN) {
+        ws.close();
+      }
+    }, 10000);
+
     ws.onopen = () => {
+      clearTimeout(connectTimeout);
       setConnected(true);
       setConnectionFailed(false);
       retriesRef.current = 0;
@@ -39,6 +54,7 @@ export function useWebSocket(nickname: string) {
     };
 
     ws.onclose = () => {
+      clearTimeout(connectTimeout);
       setConnected(false);
       if (retriesRef.current < maxRetries) {
         retriesRef.current++;

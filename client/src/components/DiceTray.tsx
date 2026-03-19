@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, memo } from 'react';
 
 interface Props {
   dice: number[];
@@ -30,7 +30,7 @@ function DiceFace({ value, size = 44 }: { value: number; size?: number }) {
   );
 }
 
-export default function DiceTray({ dice, held, rollCount, isMyTurn, settled, onHold }: Props) {
+export default memo(function DiceTray({ dice, held, rollCount, isMyTurn, settled, onHold }: Props) {
   const canInteract = isMyTurn && rollCount > 0 && settled;
   const prevHeldRef = useRef<boolean[]>([false, false, false, false, false]);
 
@@ -58,6 +58,7 @@ export default function DiceTray({ dice, held, rollCount, isMyTurn, settled, onH
             key={i}
             onClick={() => canInteract && onHold(i)}
             disabled={!canInteract}
+            aria-pressed={isHeld}
             aria-label={`Dice ${i + 1}: ${d}${isHeld ? ' (held)' : ''}`}
             className={`
               relative w-12 h-12 rounded-lg flex items-center justify-center
@@ -104,4 +105,4 @@ export default function DiceTray({ dice, held, rollCount, isMyTurn, settled, onH
       `}</style>
     </div>
   );
-}
+});

@@ -36,6 +36,7 @@ export type GameAction =
   | { type: 'CLEAR_REACTION'; id: string }
   | { type: 'SET_HOVERED'; category: string | null; playerId: string }
   | { type: 'GAME_POUR' }
+  | { type: 'REMOVE_PLAYER'; playerId: string }
   | { type: 'RESET_GAME' };
 
 const initialState: GameState = {
@@ -88,6 +89,8 @@ function reducer(state: GameState, action: GameAction): GameState {
       return { ...state, pourCount: state.pourCount + 1 };
     case 'CLEAR_REACTION':
       return { ...state, reactions: state.reactions.filter(r => r.id !== action.id) };
+    case 'REMOVE_PLAYER':
+      return { ...state, players: state.players.filter(p => p.id !== action.playerId) };
     case 'RESET_GAME':
       return { ...initialState, nickname: state.nickname };
     default:

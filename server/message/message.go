@@ -21,6 +21,22 @@ func Parse(data []byte) (Envelope, error) {
 	return e, err
 }
 
+// Valid reaction emojis
+var ValidEmojis = map[string]bool{
+	"👍": true, "👏": true, "😂": true, "😱": true,
+	"🔥": true, "💀": true, "🎉": true, "😭": true,
+}
+
+func ValidCategory(cat string) bool {
+	switch cat {
+	case "ones", "twos", "threes", "fours", "fives", "sixes",
+		"choice", "fourOfAKind", "fullHouse",
+		"smallStraight", "largeStraight", "yacht":
+		return true
+	}
+	return false
+}
+
 // Error codes
 const (
 	ErrNotYourTurn    = "NOT_YOUR_TURN"

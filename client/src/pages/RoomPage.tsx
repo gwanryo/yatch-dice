@@ -76,6 +76,7 @@ export default function RoomPage({ state, dispatch, send, playerId }: Props) {
             </button>
           ) : (
             <button onClick={() => send('room:ready')}
+              aria-pressed={isReady}
               className={`flex-1 py-3 rounded-lg font-bold transition-colors focus-visible:ring-2 focus-visible:ring-white ${isReady ? 'bg-gray-600 hover:bg-gray-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
               {isReady ? t('room.cancel') : t('room.ready')}
             </button>

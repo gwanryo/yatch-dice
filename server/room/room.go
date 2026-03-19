@@ -253,6 +253,17 @@ func (r *Room) EndGame() {
 func (r *Room) Rematch(playerID string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	// Verify player is in the room
+	found := false
+	for _, p := range r.players {
+		if p.ID == playerID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return false
+	}
 	r.rematch[playerID] = true
 	if len(r.rematch) >= len(r.players) {
 		r.status = "waiting"

@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -15,6 +17,58 @@ import (
 	"yacht-dice-server/player"
 	"yacht-dice-server/room"
 )
+
+// rateLimiter tracks per-connection message rates.
+type rateLimiter struct {
+	mu        sync.Mutex
+	tokens    int
+	maxTokens int
+	lastTime  time.Time
+	rate      time.Duration // refill one token per this duration
+}
+
+func newRateLimiter(maxTokens int, rate time.Duration) *rateLimiter {
+	return &rateLimiter{
+		tokens:    maxTokens,
+		maxTokens: maxTokens,
+		lastTime:  time.Now(),
+		rate:      rate,
+	}
+}
+
+func (rl *rateLimiter) Allow() bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	now := time.Now()
+	elapsed := now.Sub(rl.lastTime)
+	refill := int(elapsed / rl.rate)
+	if refill > 0 {
+		rl.tokens = min(rl.maxTokens, rl.tokens+refill)
+		rl.lastTime = now
+	}
+	if rl.tokens > 0 {
+		rl.tokens--
+		return true
+	}
+	return false
+}
+
+// hoverThrottle tracks the last hover time per player.
+type hoverThrottle struct {
+	mu   sync.Mutex
+	last time.Time
+}
+
+func (ht *hoverThrottle) Allow() bool {
+	ht.mu.Lock()
+	defer ht.mu.Unlock()
+	now := time.Now()
+	if now.Sub(ht.last) < 200*time.Millisecond {
+		return false
+	}
+	ht.last = now
+	return true
+}
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -79,6 +133,9 @@ func (wh *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	data, _ := message.New("connected", message.ConnectedPayload{PlayerID: p.ID})
 	p.Send(data)
 
+	rl := newRateLimiter(30, 100*time.Millisecond) // 30 tokens, refill 1 per 100ms = ~10 msg/s
+	ht := &hoverThrottle{}
+
 	for {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
@@ -86,11 +143,14 @@ func (wh *WSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			wh.handleDisconnect(p)
 			return
 		}
+		if !rl.Allow() {
+			continue // silently drop rate-limited messages
+		}
 		env, err := message.Parse(msg)
 		if err != nil {
 			continue
 		}
-		wh.handleMessage(p, env)
+		wh.handleMessageWithThrottle(p, env, ht)
 	}
 }
 
@@ -133,6 +193,13 @@ func (wh *WSHandler) handleDisconnect(p *player.Player) {
 		rm.Broadcast(leftData)
 		rm.BroadcastState()
 	}
+}
+
+func (wh *WSHandler) handleMessageWithThrottle(p *player.Player, env message.Envelope, ht *hoverThrottle) {
+	if env.Type == "game:hover" && !ht.Allow() {
+		return
+	}
+	wh.handleMessage(p, env)
 }
 
 func (wh *WSHandler) handleMessage(p *player.Player, env message.Envelope) {
@@ -295,6 +362,7 @@ func (wh *WSHandler) handleHover(p *player.Player, payload json.RawMessage) {
 	}
 	var req message.GameHoverPayload
 	if err := json.Unmarshal(payload, &req); err != nil {
+		log.Printf("hover unmarshal error (player %s): %v", p.ID, err)
 		return
 	}
 	currentPlayer, _, rollCount, ok := rm.TurnInfo()
@@ -313,6 +381,10 @@ func (wh *WSHandler) handleScore(p *player.Player, payload json.RawMessage) {
 	var req message.GameScorePayload
 	if err := json.Unmarshal(payload, &req); err != nil {
 		wh.sendError(p, message.ErrInvalidPayload, "Invalid payload")
+		return
+	}
+	if !message.ValidCategory(req.Category) {
+		wh.sendError(p, message.ErrInvalidPayload, "Invalid category")
 		return
 	}
 	result, err := rm.Score(p.ID, req.Category)
@@ -397,6 +469,9 @@ func (wh *WSHandler) handleReaction(p *player.Player, payload json.RawMessage) {
 	if err := json.Unmarshal(payload, &req); err != nil {
 		wh.sendError(p, message.ErrInvalidPayload, "Invalid payload")
 		return
+	}
+	if !message.ValidEmojis[req.Emoji] {
+		return // silently drop invalid emoji
 	}
 	data, _ := message.New("reaction:show", message.ReactionShowPayload{PlayerID: p.ID, Emoji: req.Emoji})
 	rm.Broadcast(data)

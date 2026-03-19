@@ -923,12 +923,14 @@ function createDiceScene(canvas: HTMLCanvasElement) {
     }
   }
 
-  const clock = new THREE.Clock();
+  let lastFrameTime = performance.now();
   let animFrameId = 0;
 
   function animate() {
     animFrameId = requestAnimationFrame(animate);
-    const dt = clock.getDelta();
+    const now = performance.now();
+    const dt = (now - lastFrameTime) / 1000;
+    lastFrameTime = now;
     upState();
     if (state !== S.IDLE && state !== S.RESULT) world.step(PHYS_STEP, dt, MAX_SUB);
     if (state === S.SETTLE) settleNudge();
