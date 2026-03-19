@@ -13,6 +13,7 @@ export function useWebSocket(nickname: string) {
   const handlersRef = useRef<Map<string, MessageHandler[]>>(new Map());
   const queueRef = useRef<string[]>([]);
   const retriesRef = useRef(0);
+  const connectRef = useRef<(() => void) | null>(null);
   const maxRetries = 5;
 
   useEffect(() => { nicknameRef.current = nickname; }, [nickname]);
@@ -58,7 +59,7 @@ export function useWebSocket(nickname: string) {
       setConnected(false);
       if (retriesRef.current < maxRetries) {
         retriesRef.current++;
-        setTimeout(connect, 3000);
+        setTimeout(() => connectRef.current?.(), 3000);
       } else {
         setConnectionFailed(true);
       }
@@ -85,6 +86,8 @@ export function useWebSocket(nickname: string) {
       }
     };
   }, []);
+
+  useEffect(() => { connectRef.current = connect; }, [connect]);
 
   const send = useCallback((type: string, payload?: unknown) => {
     const msg = JSON.stringify({ type, payload });

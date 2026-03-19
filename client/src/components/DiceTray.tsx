@@ -1,4 +1,4 @@
-import { useRef, useEffect, memo } from 'react';
+import { useState, useEffect, memo } from 'react';
 
 interface Props {
   dice: number[];
@@ -32,11 +32,13 @@ function DiceFace({ value, size = 44 }: { value: number; size?: number }) {
 
 export default memo(function DiceTray({ dice, held, rollCount, isMyTurn, settled, onHold }: Props) {
   const canInteract = isMyTurn && rollCount > 0 && settled;
-  const prevHeldRef = useRef<boolean[]>([false, false, false, false, false]);
+  const [justHeld, setJustHeld] = useState<boolean[]>([false, false, false, false, false]);
+  const [prevHeld, setPrevHeld] = useState<boolean[]>([false, false, false, false, false]);
 
   useEffect(() => {
-    prevHeldRef.current = held;
-  }, [held]);
+    setJustHeld(held.map((h, i) => h && !prevHeld[i]));
+    setPrevHeld(held);
+  }, [held]); // eslint-disable-line react-hooks/exhaustive-deps -- prevHeld is intentionally captured at effect time
 
   if (rollCount === 0 || dice.length !== 5) return null;
 
@@ -51,7 +53,7 @@ export default memo(function DiceTray({ dice, held, rollCount, isMyTurn, settled
     >
       {dice.map((d, i) => {
         const isHeld = held[i];
-        const wasJustHeld = isHeld && !prevHeldRef.current[i];
+        const wasJustHeld = justHeld[i];
 
         return (
           <button

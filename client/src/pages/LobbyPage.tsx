@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { GameAction, GameState } from '../hooks/useGameState';
+import type { Envelope } from '../types/game';
 
 interface Props {
   state: GameState;
   dispatch: React.Dispatch<GameAction>;
   send: (type: string, payload?: unknown) => void;
-  on: (type: string, handler: (e: any) => void) => () => void;
+  on: (type: string, handler: (e: Envelope) => void) => () => void;
   playerId: string | null;
 }
 
@@ -20,7 +21,7 @@ export default function LobbyPage({ state, dispatch, send, on }: Props) {
 
   useEffect(() => {
     if (!nicknameConfirmed) return;
-    const unsub = on('room:created', (env: any) => {
+    const unsub = on('room:created', (env: Envelope) => {
       const p = env.payload as { roomCode: string };
       dispatch({ type: 'SET_ROOM', roomCode: p.roomCode });
     });
