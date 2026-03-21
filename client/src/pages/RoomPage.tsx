@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageLayout from '../components/PageLayout';
+import Button from '../components/Button';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { copyToClipboard } from '../utils/clipboard';
 import type { GameState, GameAction } from '../hooks/useGameState';
 
 interface Props {
@@ -13,30 +16,39 @@ interface Props {
 export default function RoomPage({ state, dispatch, send, playerId }: Props) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const me = state.players.find(p => p.id === playerId);
   const isHost = me?.isHost ?? false;
   const isReady = me?.isReady ?? false;
   const allOthersReady = state.players.filter(p => p.id !== playerId).every(p => p.isReady || p.isHost);
 
-  const handleLeave = () => {
-    if (!window.confirm(t('lobby.leaveConfirm'))) return;
+  const preloadDiceScene = () => {
+    import('../components/dice-scene/createDiceScene');
+  };
+
+  const handleLeave = () => setConfirmLeave(true);
+  const doLeave = () => {
     send('room:leave');
     dispatch({ type: 'RESET_GAME' });
   };
 
   return (
-    <PageLayout>
+    <PageLayout phase="room">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 mb-1">{t('app.title')}</h1>
+          <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-emerald-300 mb-1">{t('app.title')}</h1>
           <div className="flex items-center justify-center gap-2">
             <span className="text-gray-400">{t('room.code')}:</span>
             <span className="font-mono text-white text-xl tracking-widest">{state.roomCode}</span>
             <button
-              onClick={() => {
-                navigator.clipboard.writeText(state.roomCode ?? '');
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
+              onClick={async () => {
+                const ok = await copyToClipboard(state.roomCode ?? '');
+                if (ok) {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                } else {
+                  alert(t('room.copyFailed'));
+                }
               }}
               className="text-gray-400 hover:text-white transition-colors p-1 rounded focus-visible:ring-2 focus-visible:ring-white"
               aria-label={t('aria.copyRoomCode')}
@@ -56,7 +68,7 @@ export default function RoomPage({ state, dispatch, send, playerId }: Props) {
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-white font-medium truncate max-w-[10rem]">{p.nickname}</span>
                 {p.isHost && <span className="text-xs bg-amber-500 text-black px-2 py-0.5 rounded shrink-0">{t('room.host')}</span>}
-                {p.id === playerId && <span className="text-xs text-emerald-400 shrink-0">(me)</span>}
+                {p.id === playerId && <span className="text-xs text-emerald-400 shrink-0">{t('game.me')}</span>}
               </div>
               {!p.isHost && (
                 <span className={`text-sm shrink-0 ${p.isReady ? 'text-green-400' : 'text-gray-500'}`}>
@@ -71,25 +83,37 @@ export default function RoomPage({ state, dispatch, send, playerId }: Props) {
         </div>
 
         <div className="flex gap-3">
-          <button onClick={handleLeave}
-            className="flex-1 bg-red-600/80 hover:bg-red-600 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white text-white py-3 rounded-lg font-bold transition-[colors,transform]">
+          <Button variant="danger" onClick={handleLeave} className="flex-1">
             {t('room.leave')}
-          </button>
+          </Button>
           {isHost ? (
-            <button onClick={() => send('room:start')}
+            <Button onClick={() => send('room:start')}
+              onMouseEnter={preloadDiceScene}
+              onFocus={preloadDiceScene}
               disabled={state.players.length < 2 || !allOthersReady}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white disabled:opacity-40 text-white py-3 rounded-lg font-bold transition-[colors,transform] shadow-lg shadow-emerald-900/50">
+              className="flex-1">
               {t('room.start')}
-            </button>
+            </Button>
           ) : (
-            <button onClick={() => send('room:ready')}
+            <Button
+              variant={isReady ? 'ghost' : 'primary'}
+              onClick={() => send('room:ready')}
               aria-pressed={isReady}
-              className={`flex-1 py-3 rounded-lg font-bold transition-[colors,transform] active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white ${isReady ? 'bg-gray-600 hover:bg-gray-700 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/50'}`}>
+              className="flex-1">
               {isReady ? t('room.cancel') : t('room.ready')}
-            </button>
+            </Button>
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmLeave}
+        message={t('lobby.leaveConfirm')}
+        confirmLabel={t('room.leave')}
+        cancelLabel={t('room.cancel')}
+        variant="danger"
+        onConfirm={doLeave}
+        onCancel={() => setConfirmLeave(false)}
+      />
     </PageLayout>
   );
 }

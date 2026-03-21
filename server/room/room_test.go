@@ -505,6 +505,36 @@ func TestNicknameMap(t *testing.T) {
 	}
 }
 
+func TestRemovePlayerClearsRematchVote(t *testing.T) {
+	rm := New("TEST01", "")
+	p1 := newMockPlayer("p1", "Alice")
+	p2 := newMockPlayer("p2", "Bob")
+	rm.AddPlayer(p1)
+	rm.AddPlayer(p2)
+
+	// Simulate end-of-game state
+	rm.StartGame()
+	rm.EndGame()
+
+	// p1 votes for rematch
+	rm.Rematch("p1")
+	votes := rm.RematchVotes()
+	if len(votes) != 1 || votes[0] != "p1" {
+		t.Fatalf("expected 1 vote from p1, got %v", votes)
+	}
+
+	// p1 leaves
+	rm.RemovePlayer("p1", func() {})
+
+	// rematch vote should be cleared
+	votes = rm.RematchVotes()
+	for _, v := range votes {
+		if v == "p1" {
+			t.Fatalf("p1's rematch vote should have been removed, got %v", votes)
+		}
+	}
+}
+
 func TestFindPlayer(t *testing.T) {
 	rm := New("TEST01", "")
 	p1 := newMockPlayer("p1", "Alice")

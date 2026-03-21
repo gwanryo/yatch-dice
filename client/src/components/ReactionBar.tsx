@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, memo } from 'react';
+import { useEffect, useRef, useState, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const EMOJIS = ['\u{1F44D}', '\u{1F44F}', '\u{1F602}', '\u{1F631}', '\u{1F525}', '\u{1F480}', '\u{1F389}', '\u{1F62D}'];
 
-const EMOJI_LABELS: Record<string, string> = {
-  '\u{1F44D}': 'thumbs up', '\u{1F44F}': 'clap', '\u{1F602}': 'laugh', '\u{1F631}': 'scream',
+const EMOJI_KEYS: Record<string, string> = {
+  '\u{1F44D}': 'thumbsUp', '\u{1F44F}': 'clap', '\u{1F602}': 'laugh', '\u{1F631}': 'scream',
   '\u{1F525}': 'fire', '\u{1F480}': 'skull', '\u{1F389}': 'party', '\u{1F62D}': 'cry',
 };
 
@@ -30,12 +30,13 @@ interface FloatingEmoji {
 export default memo(function ReactionBar({ onSend, reactions, onExpire, players }: Props) {
   const { t } = useTranslation();
   const activeTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const floatTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [floats, setFloats] = useState<FloatingEmoji[]>([]);
   const [badges, setBadges] = useState<Record<string, number>>({});
   const badgeTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const processedIds = useRef<Set<string>>(new Set());
 
-  const nick = (id: string) => players.find(p => p.id === id)?.nickname ?? '?';
+  const nick = useCallback((id: string) => players.find(p => p.id === id)?.nickname ?? '?', [players]);
 
   // Process new reactions → floating emojis + badges
   useEffect(() => {
@@ -62,9 +63,11 @@ export default memo(function ReactionBar({ onSend, reactions, onExpire, players 
       });
 
       // Remove float after animation
-      setTimeout(() => {
+      const floatTimer = setTimeout(() => {
         setFloats(prev => prev.filter(f => f.id !== r.id));
+        floatTimers.current.delete(r.id);
       }, FLOAT_DURATION);
+      floatTimers.current.set(r.id, floatTimer);
 
       // Update badge count
       setBadges(prev => ({ ...prev, [r.emoji]: (prev[r.emoji] ?? 0) + 1 }));
@@ -91,24 +94,28 @@ export default memo(function ReactionBar({ onSend, reactions, onExpire, players 
       }
     }
 
-    // Clean up timers for removed reactions
+    // Clean up timers for removed reactions (Set for O(1) lookup)
+    const currentIds = new Set(reactions.map(r => r.id));
     for (const [id, timer] of activeTimers.current) {
-      if (!reactions.some(r => r.id === id)) {
+      if (!currentIds.has(id)) {
         clearTimeout(timer);
         activeTimers.current.delete(id);
       }
     }
-  }, [reactions, onExpire, players]); // eslint-disable-line react-hooks/exhaustive-deps -- nick uses players
+  }, [reactions, onExpire, nick]);
 
   // Clean up all timers on unmount
   useEffect(() => {
     const timers = activeTimers.current;
+    const fTimers = floatTimers.current;
     const bTimers = badgeTimers.current;
     const pIds = processedIds.current;
     return () => {
       for (const timer of timers.values()) clearTimeout(timer);
+      for (const timer of fTimers.values()) clearTimeout(timer);
       for (const timer of bTimers.values()) clearTimeout(timer);
       timers.clear();
+      fTimers.clear();
       bTimers.clear();
       pIds.clear();
     };
@@ -138,18 +145,18 @@ export default memo(function ReactionBar({ onSend, reactions, onExpire, players 
           <button
             key={e}
             onClick={() => onSend(e)}
-            aria-label={t('aria.sendReaction', { name: EMOJI_LABELS[e] ?? 'reaction' })}
+            aria-label={t('aria.sendReaction', { name: t(`aria.emoji.${EMOJI_KEYS[e]}`) })}
             className="relative w-10 h-10 text-xl rounded-full bg-white/8 border-2 border-transparent
               hover:bg-white/15 hover:border-white/20 hover:scale-115
               active:scale-90 transition-[transform,background-color,border-color] duration-150
               focus-visible:ring-2 focus-visible:ring-white"
           >
             {e}
-            {badges[e] && (
+            {badges[e] ? (
               <span className="absolute -top-1 -right-1 min-w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 animate-badge-pop pointer-events-none">
                 {badges[e]}
               </span>
-            )}
+            ) : null}
           </button>
         ))}
       </div>

@@ -120,6 +120,7 @@ func (r *Room) RemovePlayer(playerID string, onEmpty func()) {
 	}
 	r.players = append(r.players[:idx], r.players[idx+1:]...)
 	delete(r.ready, playerID)
+	delete(r.rematch, playerID)
 	if r.hostID == playerID && len(r.players) > 0 {
 		r.hostID = r.players[0].ID
 	}

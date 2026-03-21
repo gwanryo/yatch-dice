@@ -5,8 +5,16 @@ import type { DiceSceneAPI } from '../components/DiceScene';
 import DiceTray from '../components/DiceTray';
 import ScoreBoard from '../components/ScoreBoard';
 import ReactionBar from '../components/ReactionBar';
+import HandAnnouncement from '../components/HandAnnouncement';
+import Button from '../components/Button';
+import ErrorBoundary from '../components/ErrorBoundary';
 import type { GameState, GameAction } from '../hooks/useGameState';
 import type { Category } from '../types/game';
+import { isSpecialHand } from '../utils/scoreCalculator';
+
+const sceneFallback = (
+  <div className="fixed inset-0 bg-gradient-to-br from-gray-950 via-emerald-950 to-gray-950" style={{ zIndex: 0 }} />
+);
 
 interface Props {
   state: GameState;
@@ -20,7 +28,13 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
   const isMyTurn = state.currentPlayer === playerId;
   const [rollPhase, setRollPhase] = useState<'idle' | 'shaking' | 'rolling' | 'settled'>('idle');
   const prevRollCountRef = useRef(state.rollCount);
+  const prevPourRef = useRef(state.pourCount);
+  const prevPlayerRef = useRef(state.currentPlayer);
   const sceneRef = useRef<DiceSceneAPI>(null);
+
+  // #6: Hand announcement state
+  const [announcedHand, setAnnouncedHand] = useState<Category | null>(null);
+  const [announcedScore, setAnnouncedScore] = useState<number | undefined>();
 
   const handleShake = () => {
     if (!isMyTurn || state.rollCount >= 3) return;
@@ -37,40 +51,37 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
     }
   };
 
-  // Trigger animation when dice values arrive
+  // Unified dice scene synchronization
   useEffect(() => {
+    const api = sceneRef.current;
+    if (!api) return;
+
+    // Turn changed → reset
+    if (state.currentPlayer !== prevPlayerRef.current) {
+      prevPlayerRef.current = state.currentPlayer;
+      setRollPhase('idle');
+      prevRollCountRef.current = 0;
+      prevPourRef.current = 0;
+    }
+
+    // Always sync held state
+    api.setHeld(state.held);
+
+    // Roll count incremented → start shake animation
     if (state.rollCount > prevRollCountRef.current && state.dice.length === 5) {
-      const api = sceneRef.current;
-      if (api) {
-        api.setHeld(state.held);
-        api.setValues(state.dice);
-        api.shake();
-        setRollPhase('shaking');
-      }
+      api.setValues(state.dice);
+      api.shake();
+      setRollPhase('shaking');
     }
     prevRollCountRef.current = state.rollCount;
-  }, [state.rollCount, state.dice, state.held, isMyTurn]);
 
-  // Remote players: roll when active player clicks Roll (game:pour)
-  const prevPourRef = useRef(state.pourCount);
-  useEffect(() => {
+    // Pour count incremented (remote player) → trigger roll
     if (state.pourCount > prevPourRef.current && !isMyTurn) {
-      sceneRef.current?.roll();
+      api.roll();
       setRollPhase('rolling');
     }
     prevPourRef.current = state.pourCount;
-  }, [state.pourCount, isMyTurn]);
-
-  // Sync held state to 3D scene whenever it changes (e.g. from game:held)
-  useEffect(() => {
-    sceneRef.current?.setHeld(state.held);
-  }, [state.held]);
-
-  // Reset rollPhase when turn changes
-  useEffect(() => {
-    setRollPhase('idle');
-    prevRollCountRef.current = 0;
-  }, [state.currentPlayer]);
+  }, [state.rollCount, state.pourCount, state.held, state.currentPlayer, isMyTurn, state.dice]);
 
   const handleSettled = useCallback(() => {
     setRollPhase('settled');
@@ -80,10 +91,32 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
     sceneRef.current?.onResult(handleSettled);
   }, [handleSettled]);
 
+  // #6: Trigger hand announcement on score selection
   const handleScore = useCallback((category: Category) => {
+    const hand = isSpecialHand(state.dice, category);
+    if (hand) {
+      setAnnouncedHand(category);
+      setAnnouncedScore(hand.score);
+    }
     send('game:score', { category });
     setRollPhase('idle');
-  }, [send]);
+  }, [send, state.dice]);
+
+  const handleAnnouncementDone = useCallback(() => {
+    setAnnouncedHand(null);
+    setAnnouncedScore(undefined);
+  }, []);
+
+  // Remote player scored — show announcement if special hand with score > 0
+  useEffect(() => {
+    const scored = state.lastScored;
+    if (!scored || scored.playerId === playerId) return;
+    const SPECIAL: string[] = ['fourOfAKind', 'fullHouse', 'smallStraight', 'largeStraight', 'yacht'];
+    if (SPECIAL.includes(scored.category) && scored.score > 0) {
+      setAnnouncedHand(scored.category as Category);
+      setAnnouncedScore(scored.score);
+    }
+  }, [state.lastScored, playerId]);
 
   const handleHold = useCallback((index: number) => {
     send('game:hold', { index });
@@ -119,16 +152,21 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
       {/* Accessible heading for screen readers */}
       <h1 className="sr-only">{t('app.title')} - {t('game.round')} {state.round}/12</h1>
 
-      {/* 3D Scene — fullscreen background */}
-      <DiceScene ref={sceneRef} />
+      {/* 3D Scene — fullscreen background, isolated error boundary */}
+      <ErrorBoundary fallback={sceneFallback}>
+        <DiceScene ref={sceneRef} />
+      </ErrorBoundary>
+
+      {/* #6: Hand announcement overlay */}
+      <HandAnnouncement category={announcedHand} score={announcedScore} onDone={handleAnnouncementDone} />
 
       {/* UI Overlay */}
-      <main id="main-content" className="relative z-10 h-full flex flex-col pointer-events-none">
+      <main id="main-content" className="relative z-10 h-full flex flex-col pointer-events-none pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
         {/* Top bar — turn indicator */}
         <header className={`pointer-events-auto flex justify-between items-center px-4 py-2.5 transition-[color,background-color,box-shadow] duration-300 ${
           isMyTurn
             ? 'bg-gradient-to-r from-yellow-600/80 via-amber-500/80 to-yellow-600/80 shadow-lg shadow-yellow-500/20'
-            : 'bg-black/40 backdrop-blur-sm'
+            : 'bg-black/40 backdrop-blur-md'
         }`}>
           <span className="text-white font-bold tabular-nums">
             {t('game.round')} {state.round}/12
@@ -173,21 +211,35 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
             settled={rollPhase === 'settled' || rollPhase === 'idle'}
             onHold={handleHold}
           />
-          <div className="flex gap-4">
-            {rollPhase === 'shaking' && isMyTurn && (
-              <button onClick={handleRoll}
-                className="px-8 py-3 bg-green-600 hover:bg-green-700 active:scale-[0.97] text-white font-bold rounded-xl text-lg transition-[colors,transform] focus-visible:ring-2 focus-visible:ring-white shadow-lg">
-                {t('game.rollDice')}
-              </button>
-            )}
-            {rollPhase !== 'shaking' && rollPhase !== 'rolling' && (
-              <button onClick={handleShake}
-                disabled={!isMyTurn || state.rollCount >= 3}
-                className="px-8 py-3 bg-orange-500 hover:bg-orange-600 active:scale-[0.97] disabled:opacity-40 text-white font-bold rounded-xl text-lg transition-[colors,transform] focus-visible:ring-2 focus-visible:ring-white shadow-lg">
-                {t('game.shake')}
-                {state.rollCount > 0 && ` (${3 - state.rollCount})`}
-              </button>
-            )}
+          {/* Button area — always visible */}
+          <div className="flex flex-col items-center gap-2 min-h-[52px]">
+            <span className="sr-only" role="status" aria-live="polite">
+              {rollPhase === 'shaking' ? t('game.rollDice') : rollPhase === 'rolling' ? t('game.rolling') : ''}
+            </span>
+            <div className="flex gap-4">
+              {rollPhase === 'shaking' && isMyTurn ? (
+                <Button variant="success" size="lg" onClick={handleRoll}>
+                  {t('game.rollDice')}
+                </Button>
+              ) : rollPhase === 'rolling' ? (
+                <Button variant="ghost" size="lg" disabled>
+                  {t('game.rolling')}
+                </Button>
+              ) : !isMyTurn ? (
+                <Button variant="ghost" size="lg" disabled>
+                  {t('game.opponentTurn')}
+                </Button>
+              ) : state.rollCount >= 3 ? (
+                <Button variant="ghost" size="lg" disabled>
+                  {t('game.selectScore')}
+                </Button>
+              ) : (
+                <Button variant="warning" size="lg" onClick={handleShake}>
+                  {t('game.shake')}
+                  {state.rollCount > 0 && ` (${3 - state.rollCount})`}
+                </Button>
+              )}
+            </div>
           </div>
           <ReactionBar
             onSend={handleReaction}

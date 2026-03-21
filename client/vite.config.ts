@@ -5,6 +5,16 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/three')) return 'three';
+          if (id.includes('node_modules/cannon-es')) return 'cannon-es';
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       '/ws': {

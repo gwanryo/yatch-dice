@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageLayout from '../components/PageLayout';
+import Button from '../components/Button';
+import { extractRoomCode } from '../utils/extractRoomCode';
 import type { GameAction, GameState } from '../hooks/useGameState';
 import type { Envelope } from '../types/game';
 
@@ -15,10 +17,21 @@ interface Props {
 export default function LobbyPage({ state, dispatch, send, on }: Props) {
   const { t, i18n } = useTranslation();
   const [nickname, setNickname] = useState(state.nickname);
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('room')?.toUpperCase() || '';
+    } catch { return ''; }
+  });
   const [password, setPassword] = useState('');
   const [createPassword, setCreatePassword] = useState('');
   const nicknameConfirmed = !!state.nickname;
+  const urlRoomCode = useRef(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('room')?.toUpperCase() || '';
+    } catch { return ''; }
+  });
+  const autoJoinSent = useRef(false);
 
   useEffect(() => {
     if (!nicknameConfirmed) return;
@@ -29,11 +42,34 @@ export default function LobbyPage({ state, dispatch, send, on }: Props) {
     return unsub;
   }, [on, dispatch, nicknameConfirmed]);
 
+  // Auto-join room if URL contains ?room=XXXXX after nickname is confirmed
+  useEffect(() => {
+    if (!nicknameConfirmed || autoJoinSent.current) return;
+    const roomFromUrl = urlRoomCode.current();
+    if (roomFromUrl && roomFromUrl.length >= 4) {
+      autoJoinSent.current = true;
+      send('room:join', { roomCode: roomFromUrl });
+    }
+  }, [nicknameConfirmed, send]);
+
   const handleNicknameSubmit = () => {
-    if (!nickname) return;
-    dispatch({ type: 'SET_NICKNAME', nickname });
-    localStorage.setItem('yacht-nickname', nickname);
+    const trimmed = nickname.trim();
+    if (!trimmed) return;
+    dispatch({ type: 'SET_NICKNAME', nickname: trimmed });
+    try {
+      localStorage.setItem('yacht-nickname', trimmed);
+      localStorage.setItem('yacht-storage-v', '1');
+    } catch { /* quota exceeded or private browsing */ }
   };
+
+  const handleCodePaste = useCallback((e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData('text');
+    const extracted = extractRoomCode(pasted);
+    if (extracted && extracted !== pasted.toUpperCase()) {
+      e.preventDefault();
+      setCode(extracted);
+    }
+  }, []);
 
   const handleCreate = () => {
     send('room:create', { password: createPassword || undefined });
@@ -52,13 +88,14 @@ export default function LobbyPage({ state, dispatch, send, on }: Props) {
   // Step 1: Nickname input
   if (!nicknameConfirmed) {
     return (
-      <PageLayout>
+      <PageLayout phase="lobby">
         <div className="w-full max-w-md space-y-6">
           <div className="text-center">
             <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 mb-2 drop-shadow-lg">{t('app.title')}</h1>
-            <div className="flex justify-center gap-2">
+            <div className="flex justify-center gap-2" role="group" aria-label={t('lobby.languageSelect', 'Language')}>
               {langs.map(l => (
                 <button key={l.code} onClick={() => i18n.changeLanguage(l.code)}
+                  aria-current={i18n.language === l.code ? 'true' : undefined}
                   className={`px-3 py-1 rounded text-sm focus-visible:ring-2 focus-visible:ring-white transition-colors ${i18n.language === l.code ? 'bg-amber-500 text-black font-semibold' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>
                   {l.label}
                 </button>
@@ -68,13 +105,12 @@ export default function LobbyPage({ state, dispatch, send, on }: Props) {
           <form onSubmit={e => { e.preventDefault(); handleNicknameSubmit(); }} className="bg-black/40 backdrop-blur-md rounded-xl p-6 space-y-4 border border-white/10 shadow-2xl shadow-emerald-900/30">
             <label htmlFor="nickname" className="block text-gray-300 text-sm font-medium">{t('lobby.nickname')}</label>
             <input id="nickname" name="nickname" autoComplete="username" spellCheck={false} autoFocus={window.matchMedia('(pointer: fine)').matches}
-              value={nickname} onChange={e => setNickname(e.target.value.trim())}
+              value={nickname} onChange={e => setNickname(e.target.value)}
               placeholder={t('lobby.nicknamePlaceholder')} maxLength={20}
               className="w-full bg-white/10 text-white rounded-lg px-4 py-3 focus-visible:ring-2 focus-visible:ring-amber-500 text-lg border border-white/10 placeholder:text-white/30 outline-2 outline-transparent" />
-            <button type="submit" disabled={!nickname}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 active:scale-[0.97] disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-white text-white font-bold py-3 rounded-lg transition-[colors,transform] text-lg shadow-lg shadow-emerald-900/50">
+            <Button type="submit" disabled={!nickname.trim()} className="w-full text-lg">
               {t('lobby.join')}
-            </button>
+            </Button>
           </form>
         </div>
       </PageLayout>
@@ -83,7 +119,7 @@ export default function LobbyPage({ state, dispatch, send, on }: Props) {
 
   // Step 2: Room list / create / join
   return (
-    <PageLayout>
+    <PageLayout phase="lobby">
       <div className="w-full max-w-lg space-y-6">
         <div className="text-center">
           <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 mb-2 drop-shadow-lg">{t('app.title')}</h1>
@@ -91,22 +127,24 @@ export default function LobbyPage({ state, dispatch, send, on }: Props) {
         </div>
 
         <div className="bg-black/40 backdrop-blur-md rounded-xl p-4 space-y-3 border border-white/10 shadow-2xl shadow-emerald-900/30">
+          <h2 className="sr-only">{t('lobby.createRoom')}</h2>
           <label className="sr-only" htmlFor="create-password">{t('lobby.passwordPlaceholder')}</label>
           <input id="create-password" name="create-password" autoComplete="new-password" type="password"
             value={createPassword} onChange={e => setCreatePassword(e.target.value)}
             placeholder={t('lobby.passwordPlaceholder')}
             className="w-full bg-white/10 text-white rounded-lg px-4 py-2 focus-visible:ring-2 focus-visible:ring-amber-500 text-sm border border-white/10 placeholder:text-white/30 outline-2 outline-transparent" />
-          <button onClick={handleCreate}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white text-white font-bold py-3 rounded-lg transition-[colors,transform] shadow-lg shadow-emerald-900/50">
+          <Button onClick={handleCreate} className="w-full">
             {t('lobby.createRoom')}
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={e => { e.preventDefault(); handleJoin(code, password); }} className="bg-black/40 backdrop-blur-md rounded-xl p-4 space-y-3 border border-white/10 shadow-2xl shadow-emerald-900/30">
+          <h2 className="sr-only">{t('lobby.joinByCode')}</h2>
           <div className="flex gap-2">
             <label className="sr-only" htmlFor="room-code">{t('lobby.codePlaceholder')}</label>
             <input id="room-code" name="room-code" autoComplete="off" spellCheck={false} inputMode="text" autoCapitalize="characters"
               value={code} onChange={e => setCode(e.target.value.toUpperCase())}
+              onPaste={handleCodePaste}
               placeholder={t('lobby.codePlaceholder')} maxLength={6}
               className="flex-1 min-w-0 bg-white/10 text-white rounded-lg px-4 py-2 focus-visible:ring-2 focus-visible:ring-amber-500 uppercase tracking-widest border border-white/10 placeholder:text-white/30 outline-2 outline-transparent" />
             <label className="sr-only" htmlFor="join-password">{t('lobby.password')}</label>
@@ -115,10 +153,9 @@ export default function LobbyPage({ state, dispatch, send, on }: Props) {
               placeholder={t('lobby.password')}
               className="flex-1 min-w-0 bg-white/10 text-white rounded-lg px-4 py-2 focus-visible:ring-2 focus-visible:ring-amber-500 text-sm border border-white/10 placeholder:text-white/30 outline-2 outline-transparent" />
           </div>
-          <button type="submit" disabled={code.length < 6}
-            className="w-full bg-amber-600 hover:bg-amber-500 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-white disabled:opacity-40 text-white font-bold py-3 rounded-lg transition-[colors,transform] shadow-lg shadow-amber-900/50">
+          <Button type="submit" variant="secondary" disabled={code.length < 6} className="w-full">
             {t('lobby.join')}
-          </button>
+          </Button>
         </form>
 
       </div>

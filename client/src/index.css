@@ -1,8 +1,23 @@
 @import "tailwindcss";
 
 @theme {
-  --font-display: "Righteous", cursive;
-  --font-body: "Outfit", sans-serif;
+  --font-display: "Righteous", "Trebuchet MS", cursive;
+  --font-body: "Outfit", "Segoe UI", system-ui, sans-serif;
+
+  --color-primary: #059669;
+  --color-primary-hover: #10b981;
+  --color-primary-shadow: rgb(6 78 59 / 0.5);
+  --color-secondary: #d97706;
+  --color-secondary-hover: #f59e0b;
+  --color-secondary-shadow: rgb(120 53 15 / 0.5);
+  --color-danger: #dc2626;
+  --color-danger-hover: #dc2626;
+  --color-success: #16a34a;
+  --color-success-hover: #15803d;
+  --color-warning: #f97316;
+  --color-warning-hover: #ea580c;
+  --color-ghost: #374151;
+  --color-ghost-hover: #4b5563;
 }
 
 :root {
@@ -14,11 +29,6 @@
 
   --color-card-bg: rgba(0, 0, 0, 0.4);
   --color-card-border: rgba(255, 255, 255, 0.1);
-  --color-primary: #059669;
-  --color-primary-hover: #10b981;
-  --color-secondary: #d97706;
-  --color-secondary-hover: #f59e0b;
-  --color-danger: #dc2626;
   --color-text-primary: #ffffff;
   --color-text-secondary: rgba(255, 255, 255, 0.7);
   --color-text-muted: rgba(255, 255, 255, 0.4);
@@ -39,6 +49,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   touch-action: manipulation;
   overscroll-behavior: contain;
+  -webkit-tap-highlight-color: transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -68,6 +79,14 @@ body {
 }
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-down {
+  animation: slide-down 0.3s ease-out;
 }
 
 @keyframes dice-lock {
@@ -106,4 +125,58 @@ body {
 }
 .animate-confetti-fall {
   animation: confetti-fall 3s ease-in forwards;
+}
+
+@keyframes winner-glow {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+.animate-winner-glow {
+  position: relative;
+}
+.animate-winner-glow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 25px rgba(245,158,11,0.2), 0 0 50px rgba(245,158,11,0.08);
+  pointer-events: none;
+  animation: winner-glow 2s ease-in-out infinite;
+}
+
+.dice-tray {
+  background: linear-gradient(135deg, #3d2b1f, #5c4033);
+  border: 2px solid #7c5e4a;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.dice-held {
+  background: linear-gradient(145deg, #fef3c7, #fde68a);
+  border: 2px solid #f59e0b;
+  box-shadow: 0 0 12px rgba(245,158,11,0.4), inset 0 1px 2px rgba(255,255,255,0.5);
+}
+
+@keyframes score-flash {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.animate-score-flash {
+  position: relative;
+}
+.animate-score-flash::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: rgba(245, 158, 11, 0.4);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: score-flash 0.5s ease-out forwards;
+}
+
+@keyframes shimmer {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
+}
+.animate-shimmer {
+  animation: shimmer 3s ease-in-out infinite;
 }

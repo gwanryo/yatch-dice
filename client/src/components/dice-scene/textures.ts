@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 
+const noiseCache = new Map<string, THREE.CanvasTexture>();
 export function noiseTex(base: string, sz: number, amt: number, rep?: number): THREE.CanvasTexture {
+  const key = `${base}|${sz}|${amt}|${rep}`;
+  const cached = noiseCache.get(key);
+  if (cached) return cached;
   const c = document.createElement('canvas');
   c.width = c.height = sz;
   const ctx = c.getContext('2d')!;
@@ -15,11 +19,17 @@ export function noiseTex(base: string, sz: number, amt: number, rep?: number): T
   }
   ctx.putImageData(d, 0, 0);
   const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
   if (rep) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep, rep); }
+  noiseCache.set(key, t);
   return t;
 }
 
+const bumpCache = new Map<string, THREE.CanvasTexture>();
 export function bumpTex(sz: number, amt: number, rep?: number): THREE.CanvasTexture {
+  const key = `${sz}|${amt}|${rep}`;
+  const cached = bumpCache.get(key);
+  if (cached) return cached;
   const c = document.createElement('canvas');
   c.width = c.height = sz;
   const ctx = c.getContext('2d')!;
@@ -33,10 +43,14 @@ export function bumpTex(sz: number, amt: number, rep?: number): THREE.CanvasText
   ctx.putImageData(d, 0, 0);
   const t = new THREE.CanvasTexture(c);
   if (rep) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep, rep); }
+  bumpCache.set(key, t);
   return t;
 }
 
+const leatherTexCache = new Map<number, THREE.CanvasTexture>();
 export function leatherTex(sz: number): THREE.CanvasTexture {
+  const cached = leatherTexCache.get(sz);
+  if (cached) return cached;
   const c = document.createElement('canvas');
   c.width = c.height = sz;
   const ctx = c.getContext('2d')!;
@@ -56,12 +70,17 @@ export function leatherTex(sz: number): THREE.CanvasTexture {
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   }
   const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(2, 2);
+  leatherTexCache.set(sz, t);
   return t;
 }
 
+const leatherBumpCache = new Map<number, THREE.CanvasTexture>();
 export function leatherBump(sz: number): THREE.CanvasTexture {
+  const cached = leatherBumpCache.get(sz);
+  if (cached) return cached;
   const c = document.createElement('canvas');
   c.width = c.height = sz;
   const ctx = c.getContext('2d')!;
@@ -81,10 +100,14 @@ export function leatherBump(sz: number): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(2, 2);
+  leatherBumpCache.set(sz, t);
   return t;
 }
 
+const pipCache = new Map<number, THREE.CanvasTexture>();
 export function pipTex(val: number): THREE.CanvasTexture {
+  const cached = pipCache.get(val);
+  if (cached) return cached;
   const s = 256, c = document.createElement('canvas');
   c.width = c.height = s;
   const ctx = c.getContext('2d')!;
@@ -105,5 +128,8 @@ export function pipTex(val: number): THREE.CanvasTexture {
     ctx.arc(px, py, r, 0, Math.PI * 2);
     ctx.fill();
   });
-  return new THREE.CanvasTexture(c);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  pipCache.set(val, t);
+  return t;
 }

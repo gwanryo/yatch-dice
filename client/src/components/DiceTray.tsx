@@ -19,7 +19,7 @@ const PIP_LAYOUTS: Record<number, [number, number][]> = {
   6: [[28, 28], [72, 28], [28, 50], [72, 50], [28, 72], [72, 72]],
 };
 
-function DiceFace({ value, size = 44 }: { value: number; size?: number }) {
+const DiceFace = memo(function DiceFace({ value, size = 44 }: { value: number; size?: number }) {
   const pips = PIP_LAYOUTS[value] || [];
   const pipR = size * 0.09;
   return (
@@ -29,7 +29,7 @@ function DiceFace({ value, size = 44 }: { value: number; size?: number }) {
       ))}
     </svg>
   );
-}
+});
 
 export default memo(function DiceTray({ dice, held, rollCount, isMyTurn, settled, onHold }: Props) {
   const { t } = useTranslation();
@@ -45,12 +45,7 @@ export default memo(function DiceTray({ dice, held, rollCount, isMyTurn, settled
 
   return (
     <div
-      className="flex gap-2.5 justify-center px-4 py-3 rounded-xl"
-      style={{
-        background: 'linear-gradient(135deg, #3d2b1f, #5c4033)',
-        border: '2px solid #7c5e4a',
-        boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3)',
-      }}
+      className="dice-tray flex gap-2.5 justify-center px-4 py-3 rounded-xl"
     >
       {dice.map((d, i) => {
         const isHeld = held[i];
@@ -68,7 +63,7 @@ export default memo(function DiceTray({ dice, held, rollCount, isMyTurn, settled
               transition-[transform,background-color,color,opacity,border-color,box-shadow] duration-300
               focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-1 focus-visible:ring-offset-black
               ${isHeld
-                ? 'text-amber-900 shadow-lg scale-105'
+                ? 'dice-held text-amber-900 scale-105'
                 : settled
                   ? canInteract
                     ? 'bg-white/15 text-white hover:bg-white/25 backdrop-blur border border-white/20 cursor-pointer hover:scale-110'
@@ -77,11 +72,6 @@ export default memo(function DiceTray({ dice, held, rollCount, isMyTurn, settled
               }
               ${wasJustHeld ? 'animate-dice-lock' : ''}
             `}
-            style={isHeld ? {
-              background: 'linear-gradient(145deg, #fef3c7, #fde68a)',
-              border: '2px solid #f59e0b',
-              boxShadow: '0 0 12px rgba(245,158,11,0.4), inset 0 1px 2px rgba(255,255,255,0.5)',
-            } : undefined}
           >
             {(settled || isHeld) && <DiceFace value={d} size={44} />}
             {isHeld && (

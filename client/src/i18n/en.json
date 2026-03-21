@@ -15,7 +15,8 @@
     "players": "players",
     "waiting": "Waiting",
     "playing": "Playing",
-    "enterPassword": "Enter room password"
+    "enterPassword": "Enter room password",
+    "languageSelect": "Language"
   },
   "room": {
     "code": "Room Code",
@@ -25,7 +26,8 @@
     "leave": "Leave",
     "host": "Host",
     "waitingForPlayers": "Waiting for players\u2026",
-    "allReady": "All players ready"
+    "allReady": "All players ready",
+    "copyFailed": "Copy failed"
   },
   "game": {
     "round": "Round",
@@ -33,10 +35,14 @@
     "rollsLeft": "rolls left",
     "shake": "Shake!",
     "rollDice": "Roll!",
+    "rolling": "Rolling dice…",
     "selectCategory": "Select a category",
     "yourTurn": "Your turn",
     "waitingTurn": "{{name}}'s turn",
-    "score": "Score"
+    "score": "Score",
+    "me": "(me)",
+    "selectScore": "Select your score",
+    "opponentTurn": "Opponent's turn"
   },
   "categories": {
     "ones": "Ones", "twos": "Twos", "threes": "Threes",
@@ -47,15 +53,30 @@
   },
   "result": {
     "title": "Game Results",
-    "rankLabel": "{{rank}} place",
+    "rankLabel": "{{rank}} Place",
     "rematch": "Rematch",
     "backToLobby": "Back to Lobby"
+  },
+  "error": {
+    "webglNotSupported": "Your browser does not support WebGL",
+    "somethingWentWrong": "Something went wrong.",
+    "reloadPage": "Reload page"
   },
   "aria": {
     "diceLabel": "Dice {{index}}: {{value}}",
     "diceHeld": " (held)",
     "sendReaction": "Send {{name}}",
     "copyRoomCode": "Copy room code",
-    "diceScene": "3D dice game scene"
+    "diceScene": "3D dice game scene",
+    "emoji": {
+      "thumbsUp": "thumbs up",
+      "clap": "clap",
+      "laugh": "laugh",
+      "scream": "scream",
+      "fire": "fire",
+      "skull": "skull",
+      "party": "party",
+      "cry": "cry"
+    }
   }
 }

@@ -65,6 +65,10 @@ export function useWebSocket(nickname: string) {
       }
     };
 
+    ws.onerror = () => {
+      clearTimeout(connectTimeout);
+    };
+
     ws.onmessage = (event) => {
       try {
         const envelope: Envelope = JSON.parse(event.data);
@@ -81,8 +85,8 @@ export function useWebSocket(nickname: string) {
         if (wildcards) {
           wildcards.forEach(h => h(envelope));
         }
-      } catch {
-        // ignore parse errors
+      } catch (err) {
+        if (import.meta.env.DEV) console.warn('[WS] Failed to parse message:', err);
       }
     };
   }, []);

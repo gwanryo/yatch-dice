@@ -15,7 +15,8 @@
     "players": "人",
     "waiting": "待機中",
     "playing": "プレイ中",
-    "enterPassword": "ルームパスワードを入力してください"
+    "enterPassword": "ルームパスワードを入力してください",
+    "languageSelect": "言語選択"
   },
   "room": {
     "code": "ルームコード",
@@ -25,7 +26,8 @@
     "leave": "退出",
     "host": "ホスト",
     "waitingForPlayers": "プレイヤーを待っています\u2026",
-    "allReady": "全員準備完了"
+    "allReady": "全員準備完了",
+    "copyFailed": "コピーに失敗しました"
   },
   "game": {
     "round": "ラウンド",
@@ -33,10 +35,14 @@
     "rollsLeft": "残りロール",
     "shake": "Shake!",
     "rollDice": "Roll!",
+    "rolling": "サイコロを振っています…",
     "selectCategory": "カテゴリを選択してください",
     "yourTurn": "あなたのターン",
     "waitingTurn": "{{name}}のターン",
-    "score": "スコア"
+    "score": "スコア",
+    "me": "(自分)",
+    "selectScore": "スコアを選択してください",
+    "opponentTurn": "相手のターンです"
   },
   "categories": {
     "ones": "1", "twos": "2", "threes": "3",
@@ -51,11 +57,26 @@
     "rematch": "もう一度",
     "backToLobby": "ロビーへ"
   },
+  "error": {
+    "webglNotSupported": "お使いのブラウザはWebGLに対応していません",
+    "somethingWentWrong": "問題が発生しました。",
+    "reloadPage": "ページを再読み込み"
+  },
   "aria": {
     "diceLabel": "サイコロ {{index}}: {{value}}",
     "diceHeld": "（ホールド）",
     "sendReaction": "{{name}} を送信",
     "copyRoomCode": "ルームコードをコピー",
-    "diceScene": "3Dサイコロゲームシーン"
+    "diceScene": "3Dサイコロゲームシーン",
+    "emoji": {
+      "thumbsUp": "いいね",
+      "clap": "拍手",
+      "laugh": "笑い",
+      "scream": "叫び",
+      "fire": "炎",
+      "skull": "ドクロ",
+      "party": "パーティー",
+      "cry": "泣き"
+    }
   }
 }

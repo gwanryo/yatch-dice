@@ -1,12 +1,11 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import * as CANNON from 'cannon-es';
 import {
   DICE_SIZE, DICE_HALF, CUP_BR, CUP_TR, CUP_H,
   LIFT_HEIGHT, PHYS_STEP, MAX_SUB, TABLE_HALF,
   FADE_SPEED, COL_FLY, COL_STAGGER, LIFT_DUR,
   SLIDE_DUR, POUR_DUR, SETTLE_THRESH, PRESENT_DUR,
-  CAM_DUR, DICE_INIT_POS, PRESENT_ROW, S, CAM_TARGETS,
+  DICE_INIT_POS, PRESENT_ROW, S,
   type State,
 } from './constants';
 import { createTable } from './table';
@@ -14,6 +13,8 @@ import { createCupVisual } from './cup';
 import { createPhysicsWorld } from './physics';
 import { faceQuats, readTopFace, mkDie, UP } from './dice';
 import { slerpCannon } from './slerp';
+import { setupRenderer } from './setupRenderer';
+import { createCameraController } from './cameraController';
 
 export interface DiceSceneAPI {
   setValues(v: number[]): void;
@@ -24,60 +25,14 @@ export interface DiceSceneAPI {
 }
 
 export function createDiceScene(canvas: HTMLCanvasElement) {
-  /* ── Runtime detection ── */
-  const isMobile = navigator.maxTouchPoints > 0 || window.innerWidth <= 768;
-  const SHADOW_SIZE = isMobile ? 1024 : 2048;
-  const PX_RATIO = Math.min(window.devicePixelRatio, isMobile ? 2 : 3);
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* ── Scene, Camera, Renderer ── */
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x1a1a2e);
-  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(0, 14, 5);
-  camera.lookAt(0, 0, 0);
+  /* ── Scene, Camera, Renderer, Lighting ── */
+  const { scene, camera, renderer, controls, onResize } = setupRenderer(canvas);
+  window.addEventListener('resize', onResize, { passive: true });
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(PX_RATIO);
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
-
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.05;
-  controls.minPolarAngle = 0.1;
-  controls.maxPolarAngle = Math.PI / 2.5;
-  controls.minDistance = 8;
-  controls.maxDistance = 30;
-  controls.target.set(0, 0, 0);
-
-  /* ── Lighting ── */
-  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
-  dirLight.position.set(5, 12, 5);
-  dirLight.castShadow = true;
-  dirLight.shadow.mapSize.set(SHADOW_SIZE, SHADOW_SIZE);
-  dirLight.shadow.camera.near = 0.5;
-  dirLight.shadow.camera.far = 30;
-  const camProps = ['left', 'right', 'top', 'bottom'] as const;
-  [-14, 14, 14, -14].forEach((v, i) => {
-    (dirLight.shadow.camera as unknown as Record<string, number>)[camProps[i]] = v;
-  });
-  dirLight.shadow.bias = -0.001;
-  scene.add(dirLight);
-  const spot = new THREE.SpotLight(0xffeedd, 0.4, 30, Math.PI / 4, 0.5);
-  spot.position.set(0, 12, 0);
-  scene.add(spot);
-
-  /* ── Resize handler ── */
-  const onResize = () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  };
-  window.addEventListener('resize', onResize);
+  /* ── Camera controller ── */
+  const cam = createCameraController(camera, controls);
 
   /* ── Table ── */
   scene.add(createTable());
@@ -97,10 +52,12 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
     for (let i = 0; i < 5; i++) {
       const shouldHide = heldDice[i] && state !== S.IDLE && state !== S.PRESENT && state !== S.RESULT;
       const target = shouldHide ? 0 : 1;
-      diceOpacity[i] += (target - diceOpacity[i]) * FADE_SPEED;
+      const rate = shouldHide ? FADE_SPEED * 3 : FADE_SPEED;
+      diceOpacity[i] += (target - diceOpacity[i]) * rate;
       if (Math.abs(diceOpacity[i] - target) < 0.01) diceOpacity[i] = target;
+      const needsTransparency = diceOpacity[i] < 0.999;
       const mats = diceMeshes[i].material as THREE.MeshStandardMaterial[];
-      mats.forEach(m => { m.opacity = diceOpacity[i]; });
+      mats.forEach(m => { m.opacity = diceOpacity[i]; m.transparent = needsTransparency; });
       diceMeshes[i].castShadow = diceOpacity[i] > 0.5;
       diceMeshes[i].visible = diceOpacity[i] > 0.01;
     }
@@ -158,7 +115,7 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
     state = s;
     controls.enabled = (s === S.IDLE || s === S.RESULT);
     setDiceShadows(s === S.IDLE || s === S.SETTLE || s === S.PRESENT || s === S.RESULT);
-    if (s !== S.PRESENT) animCam(s);
+    if (s !== S.PRESENT) cam.animateTo(s);
   }
 
   /* ── Collecting ── */
@@ -387,7 +344,7 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
 
   /* ── Settling ── */
   function allStopped() {
-    return diceBodies.every(b => b.velocity.length() < SETTLE_THRESH && b.angularVelocity.length() < SETTLE_THRESH);
+    return diceBodies.every((b, i) => heldDice[i] || (b.velocity.length() < SETTLE_THRESH && b.angularVelocity.length() < SETTLE_THRESH));
   }
 
   function separateDice() {
@@ -444,10 +401,13 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
   function updateSettle() {
     const el = performance.now() - settleStart;
     const closeEnough = settleTargetCannonQ.length === 5 && diceBodies.every((body, i) => {
+      if (heldDice[i]) return true;
       const t = settleTargetCannonQ[i];
       return Math.abs(body.quaternion.x * t.x + body.quaternion.y * t.y + body.quaternion.z * t.z + body.quaternion.w * t.w) > 0.99;
     });
-    if ((el > 800 && allStopped() && closeEnough) || el > 4000) {
+    const heldCount = heldDice.filter(Boolean).length;
+    const minSettleTime = heldCount >= 3 ? 500 : 800;
+    if ((el > minSettleTime && allStopped() && closeEnough) || el > 4000) {
       separateDice();
       diceBodies.forEach((body, i) => {
         body.type = CANNON.Body.KINEMATIC;
@@ -484,12 +444,7 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
     presentToQ = targetVals.map((val, i) =>
       heldDice[i] ? diceMeshes[i].quaternion.clone() : faceQuats[val || 1].clone()
     );
-    camF.p.copy(camera.position);
-    camF.l.copy(controls.target);
-    camTTo.p.set(...CAM_TARGETS[S.RESULT].p);
-    camTTo.l.set(...CAM_TARGETS[S.RESULT].l);
-    camAS = performance.now();
-    camAnim = true;
+    cam.animateTo(S.RESULT);
     setState(S.PRESENT);
   }
 
@@ -519,39 +474,33 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
     }
   }
 
-  /* ── Camera ── */
-  let camAnim = false;
-  const camF = { p: new THREE.Vector3(), l: new THREE.Vector3() };
-  const camTTo = { p: new THREE.Vector3(), l: new THREE.Vector3() };
-  let camAS = 0;
+  /* ── Instant result (reduced motion) ── */
+  function instantResult() {
+    // Remove cup from view
+    if ((cupBody as CANNON.Body & { world: CANNON.World | null }).world) world.removeBody(cupBody);
+    cupGroup.position.set(-8, 0, 0);
+    cupGroup.quaternion.set(0, 0, 0, 1);
 
-  function animCam(s: string) {
-    const t = CAM_TARGETS[s];
-    if (!t) return;
-    camF.p.copy(camera.position);
-    camF.l.copy(controls.target);
-    camTTo.p.set(...t.p);
-    camTTo.l.set(...t.l);
-    camAS = performance.now();
-    camAnim = true;
-  }
+    // Place dice at PRESENT_ROW with target faces
+    for (let i = 0; i < 5; i++) {
+      const [x, y, z] = PRESENT_ROW[i];
+      const fq = faceQuats[targetVals[i] || 1];
+      diceBodies[i].type = CANNON.Body.KINEMATIC;
+      diceBodies[i].velocity.setZero();
+      diceBodies[i].angularVelocity.setZero();
+      diceBodies[i].position.set(x, y, z);
+      diceBodies[i].quaternion.set(fq.x, fq.y, fq.z, fq.w);
+      diceMeshes[i].position.set(x, y, z);
+      diceMeshes[i].quaternion.copy(fq);
+      diceOpacity[i] = 1;
+      const mats = diceMeshes[i].material as THREE.MeshStandardMaterial[];
+      mats.forEach(m => { m.opacity = 1; });
+      diceMeshes[i].visible = true;
+      diceMeshes[i].castShadow = true;
+    }
 
-  const _sc = new THREE.Vector3();
-  function updateCam() {
-    if (camAnim) {
-      const el = performance.now() - camAS;
-      let t = Math.min(el / CAM_DUR, 1);
-      t = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-      camera.position.lerpVectors(camF.p, camTTo.p, t);
-      controls.target.lerpVectors(camF.l, camTTo.l, t);
-      if (t >= 1) camAnim = false;
-    }
-    if (state === S.SETTLE && !camAnim) {
-      _sc.set(0, 0, 0);
-      diceMeshes.forEach(m => _sc.add(m.position));
-      _sc.divideScalar(5);
-      controls.target.lerp(_sc, 0.05);
-    }
+    cam.animateTo(S.RESULT);
+    setState(S.RESULT);
   }
 
   /* ── Sync & Loop ── */
@@ -595,7 +544,7 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
     if (state === S.SETTLE) settleNudge();
     sync();
     updateDiceOpacity();
-    updateCam();
+    cam.update(state, diceMeshes);
     controls.update();
     renderer.render(scene, camera);
   }
@@ -621,10 +570,29 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
         _pendingRoll = false;
         // Fill any null targetVals with random
         targetVals = targetVals.map(v => (v !== null && v >= 1 && v <= 6) ? v : Math.ceil(Math.random() * 6));
+        if (prefersReducedMotion) {
+          // Skip collect/shake, wait for roll() to place dice
+          setState(S.SHAKE);
+          shakePhase = 1;
+          shakeStart = performance.now();
+          if (!(cupBody as CANNON.Body & { world: CANNON.World | null }).world) world.addBody(cupBody);
+          cupBody.position.set(cupRestPos.x, LIFT_HEIGHT, cupRestPos.z);
+          cupBody.quaternion.set(0, 0, 0, 1);
+          freezeDiceKinematic();
+          return;
+        }
         startCollect();
       }
     },
     roll() {
+      if (prefersReducedMotion && (state === S.SHAKE || state === S.COLLECT)) {
+        instantResult();
+        // Defer callback so GamePage's setRollPhase('rolling') lands first
+        requestAnimationFrame(() => {
+          if (_onResultCallback) _onResultCallback(targetVals.slice() as number[]);
+        });
+        return true;
+      }
       if (state === S.SHAKE) {
         _pendingRoll = false;
         startRoll();
@@ -650,14 +618,17 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
     renderer.dispose();
 
     // Dispose all scene children
+    const texProps = ['map', 'bumpMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap', 'displacementMap', 'alphaMap'] as const;
     scene.traverse(obj => {
       if ((obj as THREE.Mesh).geometry) (obj as THREE.Mesh).geometry.dispose();
       const mat = (obj as THREE.Mesh).material;
       if (mat) {
         const mats = Array.isArray(mat) ? mat : [mat];
         mats.forEach(m => {
-          if ((m as THREE.MeshStandardMaterial).map) (m as THREE.MeshStandardMaterial).map!.dispose();
-          if ((m as THREE.MeshStandardMaterial).bumpMap) (m as THREE.MeshStandardMaterial).bumpMap!.dispose();
+          const stdMat = m as THREE.MeshStandardMaterial;
+          for (const prop of texProps) {
+            if (stdMat[prop]) { stdMat[prop].dispose(); }
+          }
           m.dispose();
         });
       }

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Dispatch } from 'react';
 import type { useWebSocket } from './useWebSocket';
 import type { GameAction } from './useGameState';
@@ -15,12 +15,13 @@ export function useGameEvents(
   dispatch: Dispatch<GameAction>,
   setError: (error: string | null) => void,
 ) {
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
   useEffect(() => {
     const unsubs = [
       ws.on('room:state', (env) => {
         const p = env.payload as RoomState;
-        dispatch({ type: 'SET_ROOM', roomCode: p.roomCode });
-        dispatch({ type: 'SET_PLAYERS', players: p.players });
+        dispatch({ type: 'SET_ROOM_STATE', roomCode: p.roomCode, players: p.players });
       }),
       ws.on('game:start', () => {
         dispatch({ type: 'SET_PHASE', phase: 'game' });
@@ -42,7 +43,7 @@ export function useGameEvents(
       }),
       ws.on('game:scored', (env) => {
         const p = env.payload as GameScoredPayload;
-        dispatch({ type: 'SET_SCORES', scores: p.totalScores });
+        dispatch({ type: 'GAME_SCORED', playerId: p.playerId, category: p.category, score: p.score, scores: p.totalScores });
       }),
       ws.on('game:turn', (env) => {
         const p = env.payload as GameTurnPayload;
@@ -56,6 +57,10 @@ export function useGameEvents(
         const p = env.payload as GameEndPayload;
         dispatch({ type: 'GAME_END', rankings: p.rankings });
       }),
+      ws.on('rematch:status', (env) => {
+        const p = env.payload as { votes: string[] };
+        dispatch({ type: 'SET_REMATCH_VOTES', votes: p.votes });
+      }),
       ws.on('reaction:show', (env) => {
         const p = env.payload as ReactionShowPayload;
         dispatch({ type: 'ADD_REACTION', playerId: p.playerId, emoji: p.emoji });
@@ -67,9 +72,13 @@ export function useGameEvents(
       ws.on('error', (env) => {
         const p = env.payload as { message: string };
         setError(p.message);
-        setTimeout(() => setError(null), 5000);
+        const timer = setTimeout(() => setError(null), 5000);
+        errorTimerRef.current = timer;
       }),
     ];
-    return () => unsubs.forEach(u => u());
+    return () => {
+      unsubs.forEach(u => u());
+      clearTimeout(errorTimerRef.current);
+    };
   }, [ws.on, dispatch, setError]);
 }

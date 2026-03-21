@@ -15,7 +15,8 @@
     "players": "명",
     "waiting": "대기 중",
     "playing": "게임 중",
-    "enterPassword": "방 비밀번호를 입력하세요"
+    "enterPassword": "방 비밀번호를 입력하세요",
+    "languageSelect": "언어 선택"
   },
   "room": {
     "code": "방 코드",
@@ -25,7 +26,8 @@
     "leave": "나가기",
     "host": "방장",
     "waitingForPlayers": "플레이어를 기다리는 중\u2026",
-    "allReady": "모든 플레이어가 준비되었습니다"
+    "allReady": "모든 플레이어가 준비되었습니다",
+    "copyFailed": "복사에 실패했습니다"
   },
   "game": {
     "round": "라운드",
@@ -33,10 +35,14 @@
     "rollsLeft": "남은 굴리기",
     "shake": "Shake!",
     "rollDice": "Roll!",
+    "rolling": "주사위를 굴리는 중…",
     "selectCategory": "카테고리를 선택하세요",
     "yourTurn": "당신의 턴",
     "waitingTurn": "{{name}}의 턴입니다",
-    "score": "점수"
+    "score": "점수",
+    "me": "(나)",
+    "selectScore": "점수를 선택하세요",
+    "opponentTurn": "상대 차례입니다"
   },
   "categories": {
     "ones": "1", "twos": "2", "threes": "3",
@@ -51,11 +57,26 @@
     "rematch": "다시하기",
     "backToLobby": "로비로"
   },
+  "error": {
+    "webglNotSupported": "WebGL을 지원하지 않는 브라우저입니다",
+    "somethingWentWrong": "문제가 발생했습니다.",
+    "reloadPage": "페이지 새로고침"
+  },
   "aria": {
     "diceLabel": "주사위 {{index}}: {{value}}",
     "diceHeld": " (고정됨)",
     "sendReaction": "{{name}} 보내기",
     "copyRoomCode": "방 코드 복사",
-    "diceScene": "3D 주사위 게임 장면"
+    "diceScene": "3D 주사위 게임 장면",
+    "emoji": {
+      "thumbsUp": "좋아요",
+      "clap": "박수",
+      "laugh": "웃음",
+      "scream": "비명",
+      "fire": "불꽃",
+      "skull": "해골",
+      "party": "파티",
+      "cry": "울음"
+    }
   }
 }

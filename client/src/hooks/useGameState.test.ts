@@ -175,4 +175,74 @@ describe('useGameState', () => {
     expect(result.current[0].round).toBe(3);
     expect(result.current[0].currentPlayer).toBe('p1');
   });
+
+  it('GAME_SCORED updates scores and sets lastScored', () => {
+    const { result } = renderHook(() => useGameState());
+    act(() => {
+      result.current[1]({
+        type: 'GAME_SCORED',
+        playerId: 'p1',
+        category: 'yacht',
+        score: 50,
+        scores: { p1: { yacht: 50 } },
+      });
+    });
+    expect(result.current[0].scores).toEqual({ p1: { yacht: 50 } });
+    expect(result.current[0].lastScored).toEqual({ playerId: 'p1', category: 'yacht', score: 50 });
+  });
+
+  it('SET_TURN clears lastScored', () => {
+    const { result } = renderHook(() => useGameState());
+    act(() => {
+      result.current[1]({
+        type: 'GAME_SCORED',
+        playerId: 'p1',
+        category: 'yacht',
+        score: 50,
+        scores: { p1: { yacht: 50 } },
+      });
+    });
+    expect(result.current[0].lastScored).not.toBeNull();
+    act(() => {
+      result.current[1]({ type: 'SET_TURN', currentPlayer: 'p2', round: 2 });
+    });
+    expect(result.current[0].lastScored).toBeNull();
+  });
+
+  // #10 Rematch votes
+  describe('rematch votes', () => {
+    it('initial state has empty rematchVotes', () => {
+      const { result } = renderHook(() => useGameState());
+      expect(result.current[0].rematchVotes).toEqual([]);
+    });
+
+    it('SET_REMATCH_VOTES updates rematchVotes', () => {
+      const { result } = renderHook(() => useGameState());
+      act(() => {
+        result.current[1]({ type: 'SET_REMATCH_VOTES', votes: ['p1'] });
+      });
+      expect(result.current[0].rematchVotes).toEqual(['p1']);
+    });
+
+    it('SET_REMATCH_VOTES updates with multiple voters', () => {
+      const { result } = renderHook(() => useGameState());
+      act(() => {
+        result.current[1]({ type: 'SET_REMATCH_VOTES', votes: ['p1', 'p2'] });
+      });
+      expect(result.current[0].rematchVotes).toEqual(['p1', 'p2']);
+    });
+
+    it('RESET_GAME clears rematchVotes', () => {
+      const { result } = renderHook(() => useGameState());
+      act(() => {
+        result.current[1]({ type: 'SET_REMATCH_VOTES', votes: ['p1', 'p2'] });
+      });
+      expect(result.current[0].rematchVotes).toEqual(['p1', 'p2']);
+
+      act(() => {
+        result.current[1]({ type: 'RESET_GAME' });
+      });
+      expect(result.current[0].rematchVotes).toEqual([]);
+    });
+  });
 });

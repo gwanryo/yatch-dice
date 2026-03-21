@@ -1,8 +1,8 @@
-import { lazy, Suspense, useEffect, useState, useCallback, Component } from 'react';
-import type { ReactNode, ErrorInfo } from 'react';
+import { lazy, Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useGameState } from './hooks/useGameState';
 import { useGameEvents } from './hooks/useGameEvents';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const LobbyPage = lazy(() => import('./pages/LobbyPage'));
 const RoomPage = lazy(() => import('./pages/RoomPage'));
@@ -11,17 +11,22 @@ const ResultPage = lazy(() => import('./pages/ResultPage'));
 
 function LoadingFallback() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-emerald-950 to-gray-950 flex items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <div className="text-4xl font-display text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 animate-pulse">
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-emerald-950 to-gray-950 flex items-center justify-center relative overflow-hidden">
+      {/* Ambient glow */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true"
+        style={{ background: 'radial-gradient(ellipse at 50% 40%, rgba(5,150,105,0.1) 0%, transparent 60%)' }}
+      />
+      <div className="flex flex-col items-center gap-5 relative z-10">
+        <div className="text-5xl font-display text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 animate-pulse drop-shadow-lg">
           Yacht Dice
         </div>
-        <div className="flex gap-1.5">
-          {[0, 1, 2].map(i => (
+        <div className="text-white/30 text-sm tracking-widest uppercase">Loading\u2026</div>
+        <div className="flex gap-2">
+          {[0, 1, 2, 3, 4].map(i => (
             <div
               key={i}
-              className="w-2.5 h-2.5 rounded-full bg-emerald-400/80"
-              style={{ animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite` }}
+              className="w-2 h-2 rounded-full bg-emerald-400/70"
+              style={{ animation: `pulse 1.4s ease-in-out ${i * 0.15}s infinite` }}
             />
           ))}
         </div>
@@ -30,62 +35,32 @@ function LoadingFallback() {
   );
 }
 
-class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
-  state = { hasError: false };
-
-  static getDerivedStateFromError(): { hasError: boolean } {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('ErrorBoundary caught:', error, info);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-950 via-emerald-950 to-gray-950 flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <p className="text-white text-lg">Something went wrong.</p>
-            <button
-              onClick={() => this.setState({ hasError: false })}
-              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-white"
-            >
-              Reload page
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
 export default function App() {
-  const [nickname, setNickname] = useState(() => {
-    return localStorage.getItem('yacht-nickname') || '';
-  });
-  const ws = useWebSocket(nickname);
   const [state, dispatch] = useGameState();
+  const ws = useWebSocket(state.nickname);
   const [error, setError] = useState<string | null>(null);
   const handleError = useCallback((msg: string | null) => setError(msg), []);
 
   useEffect(() => {
-    if (!nickname) return;
+    if (!state.nickname) return;
     ws.connect();
     return () => ws.disconnect();
-  }, [nickname, ws.connect, ws.disconnect]);
+  }, [state.nickname, ws.connect, ws.disconnect]);
 
+  // Sync room code to URL for sharing
   useEffect(() => {
-    if (state.nickname && state.nickname !== nickname) {
-      setNickname(state.nickname);
-      localStorage.setItem('yacht-nickname', state.nickname);
+    const url = new URL(window.location.href);
+    if (state.roomCode) {
+      url.searchParams.set('room', state.roomCode);
+    } else {
+      url.searchParams.delete('room');
     }
-  }, [state.nickname, nickname]);
+    window.history.replaceState({}, '', url);
+  }, [state.roomCode]);
 
   // Warn before closing tab during active game
   useEffect(() => {
-    if (state.phase !== 'game') return;
+    if (state.phase !== 'game' && state.phase !== 'room') return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
     };
@@ -94,6 +69,19 @@ export default function App() {
   }, [state.phase]);
 
   useGameEvents(ws, dispatch, handleError);
+
+  // Focus main content when phase changes
+  const pageRef = useRef<HTMLDivElement>(null);
+  const prevPhaseRef = useRef(state.phase);
+  useEffect(() => {
+    if (prevPhaseRef.current !== state.phase) {
+      prevPhaseRef.current = state.phase;
+      // Defer focus to after Suspense resolves
+      requestAnimationFrame(() => {
+        pageRef.current?.focus();
+      });
+    }
+  }, [state.phase]);
 
   const page = (() => {
     switch (state.phase) {
@@ -104,19 +92,19 @@ export default function App() {
       case 'game':
         return <Suspense fallback={<LoadingFallback />}><GamePage state={state} dispatch={dispatch} send={ws.send} playerId={ws.playerId} /></Suspense>;
       case 'result':
-        return <Suspense fallback={<LoadingFallback />}><ResultPage state={state} dispatch={dispatch} send={ws.send} /></Suspense>;
+        return <Suspense fallback={<LoadingFallback />}><ResultPage state={state} dispatch={dispatch} send={ws.send} playerId={ws.playerId} /></Suspense>;
     }
   })();
 
   return (
     <ErrorBoundary>
-      {!ws.connected && nickname && !ws.connectionFailed && (
-        <div className="fixed top-0 inset-x-0 z-50 bg-red-600/90 text-white text-center py-2 text-sm font-body" role="alert" aria-live="polite">
+      {!ws.connected && state.nickname && !ws.connectionFailed && (
+        <div className="fixed top-0 inset-x-0 z-50 bg-red-600/90 text-white text-center py-2 text-sm font-body animate-slide-down" role="alert" aria-live="polite">
           Reconnecting\u2026
         </div>
       )}
       {ws.connectionFailed && (
-        <div className="fixed top-0 inset-x-0 z-50 bg-red-800/90 text-white text-center py-2 text-sm font-body flex items-center justify-center gap-3" role="alert" aria-live="polite">
+        <div className="fixed top-0 inset-x-0 z-50 bg-red-800/90 text-white text-center py-2 text-sm font-body flex items-center justify-center gap-3 animate-slide-down" role="alert" aria-live="polite">
           <span>Connection lost.</span>
           <button
             onClick={ws.reconnect}
@@ -127,11 +115,11 @@ export default function App() {
         </div>
       )}
       {error && (
-        <div className="fixed top-0 inset-x-0 z-50 bg-amber-600/90 text-white text-center py-2 text-sm font-body" role="alert" aria-live="polite">
+        <div className="fixed top-0 inset-x-0 z-50 bg-amber-600/90 text-white text-center py-2 text-sm font-body animate-slide-down" role="alert" aria-live="polite">
           {error}
         </div>
       )}
-      <div key={state.phase} className="animate-fade-in">
+      <div key={state.phase} ref={pageRef} tabIndex={-1} className="animate-fade-in outline-none">
         {page}
       </div>
     </ErrorBoundary>

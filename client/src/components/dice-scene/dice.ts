@@ -30,10 +30,14 @@ export function readTopFace(quat: THREE.Quaternion): number {
   return best;
 }
 
+let sharedGeometry: THREE.BoxGeometry | null = null;
+
 export function mkDie(): THREE.Mesh {
-  const g = new THREE.BoxGeometry(DICE_SIZE, DICE_SIZE, DICE_SIZE);
+  if (!sharedGeometry) {
+    sharedGeometry = new THREE.BoxGeometry(DICE_SIZE, DICE_SIZE, DICE_SIZE);
+  }
   const ms = FACE_MAP.map(v => new THREE.MeshStandardMaterial({ map: pipTex(v), roughness: 0.4, metalness: 0.05, transparent: true }));
-  const m = new THREE.Mesh(g, ms);
+  const m = new THREE.Mesh(sharedGeometry, ms);
   m.castShadow = m.receiveShadow = true;
   return m;
 }
