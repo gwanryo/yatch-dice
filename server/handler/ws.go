@@ -305,32 +305,34 @@ func (wh *WSHandler) handleDisconnect(p *player.Player) {
 	data, _ := message.New("player:disconnected", message.PlayerEventPayload{PlayerID: p.ID})
 	rm.Broadcast(data)
 
-	if rm.Status() == "playing" {
-		if rm.PlayerCount() <= 2 {
-			wh.endGame(rm)
+	switch rm.Status() {
+	case "playing":
+		rm.HandleDisconnect(p.ID, func() {
+			shouldEnd := rm.PlayerCount() <= 2 && rm.Status() == "playing"
+			if shouldEnd {
+				wh.endGame(rm)
+			}
 			rm.RemovePlayer(p.ID, func() { wh.hub.RemoveRoom(rm.Code) })
 			remData, _ := message.New("player:removed", message.PlayerEventPayload{PlayerID: p.ID})
 			rm.Broadcast(remData)
-		} else {
-			rm.HandleDisconnect(p.ID, func() {
-				shouldEnd := rm.PlayerCount() <= 2 && rm.Status() == "playing"
-				if shouldEnd {
-					wh.endGame(rm)
-				}
-				rm.RemovePlayer(p.ID, func() { wh.hub.RemoveRoom(rm.Code) })
-				remData, _ := message.New("player:removed", message.PlayerEventPayload{PlayerID: p.ID})
-				rm.Broadcast(remData)
-				if !shouldEnd && rm.PlayerCount() >= 2 {
-					rm.BroadcastState()
-					wh.broadcastTurn(rm)
-				}
-			})
-		}
-	} else {
-		wh.hub.LeaveRoom(p.ID)
-		leftData, _ := message.New("player:left", message.PlayerEventPayload{PlayerID: p.ID})
-		rm.Broadcast(leftData)
-		rm.BroadcastState()
+			if !shouldEnd && rm.PlayerCount() >= 2 {
+				rm.BroadcastState()
+				wh.broadcastTurn(rm)
+			}
+		})
+	case "finished":
+		rm.HandleDisconnectWaiting(p.ID, func() {
+			rm.RemovePlayer(p.ID, func() { wh.hub.RemoveRoom(rm.Code) })
+			remData, _ := message.New("player:removed", message.PlayerEventPayload{PlayerID: p.ID})
+			rm.Broadcast(remData)
+		})
+	default:
+		rm.HandleDisconnectWaiting(p.ID, func() {
+			wh.hub.LeaveRoom(p.ID)
+			leftData, _ := message.New("player:left", message.PlayerEventPayload{PlayerID: p.ID})
+			rm.Broadcast(leftData)
+			rm.BroadcastState()
+		})
 	}
 }
 
@@ -541,7 +543,7 @@ func (wh *WSHandler) endGame(rm *room.Room) {
 	}
 	data, _ := message.New("game:end", message.GameEndPayload{Rankings: rankings})
 	rm.Broadcast(data)
-	rm.EndGame()
+	rm.EndGame(rankings)
 	rm.StartRematchTimer(func() {
 		wh.hub.RemoveRoom(rm.Code)
 	})

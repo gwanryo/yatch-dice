@@ -250,4 +250,36 @@ describe('useGameState', () => {
       expect(result.current[0].rematchVotes).toEqual([]);
     });
   });
+
+  describe('reconnection sync actions', () => {
+    it('ROOM_SYNC restores room phase', () => {
+      const { result } = renderHook(() => useGameState());
+      act(() => {
+        result.current[1]({
+          type: 'ROOM_SYNC',
+          roomCode: 'ABC123',
+          players: [{ id: 'p1', nickname: 'Alice', isHost: true, isReady: false }],
+        });
+      });
+      expect(result.current[0].phase).toBe('room');
+      expect(result.current[0].roomCode).toBe('ABC123');
+      expect(result.current[0].players).toHaveLength(1);
+    });
+
+    it('RESULT_SYNC restores result phase', () => {
+      const { result } = renderHook(() => useGameState());
+      act(() => {
+        result.current[1]({
+          type: 'RESULT_SYNC',
+          rankings: [{ playerId: 'p1', nickname: 'Alice', score: 100, rank: 1 }],
+          scores: { p1: { ones: 3 } },
+          rematchVotes: ['p1'],
+        });
+      });
+      expect(result.current[0].phase).toBe('result');
+      expect(result.current[0].rankings).toHaveLength(1);
+      expect(result.current[0].scores.p1.ones).toBe(3);
+      expect(result.current[0].rematchVotes).toEqual(['p1']);
+    });
+  });
 });

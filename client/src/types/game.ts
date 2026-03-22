@@ -72,6 +72,12 @@ export interface GameEndPayload {
   rankings: RankEntry[];
 }
 
+export interface ResultSyncPayload {
+  rankings: RankEntry[];
+  scores: Record<string, Record<string, number>>;
+  rematchVotes: string[];
+}
+
 export interface ReactionShowPayload {
   playerId: string;
   emoji: string;

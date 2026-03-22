@@ -21,20 +21,22 @@ function assert(cond, msg) {
   }
 }
 
-function connectPlayer(nickname, existingId) {
+function connectPlayer(nickname, token) {
   return new Promise((resolve, reject) => {
     const params = new URLSearchParams({ nickname });
-    if (existingId) params.set('playerId', existingId);
+    if (token) params.set('token', token);
     const ws = new WebSocket(`${WS_URL}?${params}`);
     const handlers = new Map();
     const pending = [];
     let playerId = null;
+    let playerToken = null;
 
     ws.on('error', reject);
     ws.on('message', (data) => {
       const env = JSON.parse(data.toString());
       if (env.type === 'connected') {
         playerId = env.payload.playerId;
+        playerToken = env.payload.token;
       }
       // Check pending waiters
       for (let i = pending.length - 1; i >= 0; i--) {
@@ -57,6 +59,7 @@ function connectPlayer(nickname, existingId) {
           resolve({
             ws,
             get id() { return playerId; },
+            get token() { return playerToken; },
             send(type, payload) {
               ws.send(JSON.stringify({ type, payload }));
             },
@@ -595,12 +598,13 @@ async function testReconnection() {
 
   // P2 disconnects
   const p2Id = p2.id;
+  const p2Token = p2.token;
   p2.close();
   await sleep(1000);
   p1.drain('player:disconnected');
 
-  // P2 reconnects with same playerId
-  const p2r = await connectPlayer('Pete', p2Id);
+  // P2 reconnects with token
+  const p2r = await connectPlayer('Pete', p2Token);
   assert(p2r.id === p2Id, 'Reconnected with same player ID');
 
   // Should receive game:sync (may arrive before or after connect resolves)
@@ -613,6 +617,48 @@ async function testReconnection() {
   } catch {
     // game:sync may have arrived as room:state — check buffered messages
     assert(true, 'Reconnection established (sync timing may vary)');
+  }
+
+  p1.close();
+  p2r.close();
+  await sleep(300);
+}
+
+async function testReconnectionInRoom() {
+  console.log('\n=== TEST 9b: Room Reconnection ===');
+
+  const p1 = await connectPlayer('Queenie');
+  const p2 = await connectPlayer('Rick');
+
+  p1.send('room:create', {});
+  const created = await p1.waitFor('room:created');
+  await p1.waitFor('room:state');
+  const roomCode = created.payload.roomCode;
+
+  p2.send('room:join', { roomCode });
+  await p2.waitFor('room:joined');
+  await sleep(200);
+  p1.drain('room:state');
+  p2.drain('room:state');
+
+  // P2 disconnects while in waiting room
+  const p2Id = p2.id;
+  const p2Token = p2.token;
+  p2.close();
+  await sleep(1000);
+  p1.drain('player:disconnected');
+
+  // P2 reconnects with token — should receive room:sync
+  const p2r = await connectPlayer('Rick', p2Token);
+  assert(p2r.id === p2Id, 'Room reconnect: same player ID');
+
+  await sleep(500);
+  try {
+    const sync = await p2r.waitFor('room:sync', 3000);
+    assert(sync.payload.roomCode === roomCode, 'Room reconnect: received room:sync with correct roomCode');
+    assert(sync.payload.players.length >= 2, 'Room reconnect: room:sync includes both players');
+  } catch {
+    assert(false, 'Room reconnect: expected room:sync message');
   }
 
   p1.close();
@@ -999,6 +1045,7 @@ async function main() {
     testRollAndScoreValidation,
     testPasswordRoom,
     testReconnection,
+    testReconnectionInRoom,
     testCORS,
     testGracefulShutdownHealth,
     testRoomNotFound,

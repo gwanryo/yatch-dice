@@ -33,6 +33,8 @@ type Room struct {
 	cleanup      *time.Timer
 	disconn      map[string]*time.Timer
 	rematch      map[string]bool
+	lastRankings []message.RankEntry
+	lastScores   map[string]map[string]int
 }
 
 func GenerateCode() string {
@@ -258,11 +260,15 @@ func (r *Room) IsFinished() bool {
 	return r.engine != nil && r.engine.IsFinished()
 }
 
-func (r *Room) EndGame() {
+func (r *Room) EndGame(rankings []message.RankEntry) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.status = "finished"
 	r.rematch = make(map[string]bool)
+	r.lastRankings = rankings
+	if r.engine != nil {
+		r.lastScores = r.engine.Scores()
+	}
 }
 
 // Rematch records a player's rematch vote. Returns true if all players voted.
@@ -319,6 +325,17 @@ func (r *Room) HandleDisconnect(playerID string, onTimeout func()) {
 	r.disconn[playerID] = time.AfterFunc(disconnectTimeout, onTimeout)
 }
 
+const waitingDisconnectTimeout = 30 * time.Second
+
+func (r *Room) HandleDisconnectWaiting(playerID string, onTimeout func()) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if timer, ok := r.disconn[playerID]; ok {
+		timer.Stop()
+	}
+	r.disconn[playerID] = time.AfterFunc(waitingDisconnectTimeout, onTimeout)
+}
+
 func (r *Room) HandleReconnect(playerID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -350,6 +367,10 @@ func (r *Room) Broadcast(data []byte) {
 func (r *Room) StatePayload() message.RoomStatePayload {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+	return r.statePayloadLocked()
+}
+
+func (r *Room) statePayloadLocked() message.RoomStatePayload {
 	players := make([]message.PlayerInfo, len(r.players))
 	for i, p := range r.players {
 		players[i] = message.PlayerInfo{
@@ -374,23 +395,41 @@ func (r *Room) BroadcastState() {
 func (r *Room) SyncPayload() []byte {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	if r.engine == nil {
-		return nil
+
+	switch r.status {
+	case "playing":
+		if r.engine == nil {
+			return nil
+		}
+		var preview map[string]int
+		if r.engine.RollCount() > 0 {
+			preview = r.engine.Preview(r.engine.CurrentPlayer())
+		}
+		data, _ := message.New("game:sync", message.GameSyncPayload{
+			Dice:          r.engine.Dice(),
+			Held:          r.engine.Held(),
+			RollCount:     r.engine.RollCount(),
+			Scores:        r.engine.Scores(),
+			CurrentPlayer: r.engine.CurrentPlayer(),
+			Round:         r.engine.Round(),
+			Preview:       preview,
+		})
+		return data
+	case "finished":
+		votes := make([]string, 0, len(r.rematch))
+		for pid := range r.rematch {
+			votes = append(votes, pid)
+		}
+		data, _ := message.New("result:sync", message.ResultSyncPayload{
+			Rankings:     r.lastRankings,
+			Scores:       r.lastScores,
+			RematchVotes: votes,
+		})
+		return data
+	default:
+		data, _ := message.New("room:sync", r.statePayloadLocked())
+		return data
 	}
-	var preview map[string]int
-	if r.engine.RollCount() > 0 {
-		preview = r.engine.Preview(r.engine.CurrentPlayer())
-	}
-	data, _ := message.New("game:sync", message.GameSyncPayload{
-		Dice:          r.engine.Dice(),
-		Held:          r.engine.Held(),
-		RollCount:     r.engine.RollCount(),
-		Scores:        r.engine.Scores(),
-		CurrentPlayer: r.engine.CurrentPlayer(),
-		Round:         r.engine.Round(),
-		Preview:       preview,
-	})
-	return data
 }
 
 func (r *Room) ListItem() message.RoomListItem {

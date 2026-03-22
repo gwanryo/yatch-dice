@@ -162,6 +162,11 @@ type RankEntry struct {
 	Score    int    `json:"score"`
 	Rank     int    `json:"rank"`
 }
+type ResultSyncPayload struct {
+	Rankings     []RankEntry               `json:"rankings"`
+	Scores       map[string]map[string]int `json:"scores"`
+	RematchVotes []string                  `json:"rematchVotes"`
+}
 
 // Payloads: Rematch
 type RematchStatusPayload struct {

@@ -44,7 +44,9 @@ export type GameAction =
   | { type: 'SET_REMATCH_VOTES'; votes: string[] }
   | { type: 'RESET_GAME' }
   | { type: 'CLEAR_NICKNAME' }
-  | { type: 'CLEAR_LAST_SCORED' };
+  | { type: 'CLEAR_LAST_SCORED' }
+  | { type: 'ROOM_SYNC'; roomCode: string; players: PlayerInfo[] }
+  | { type: 'RESULT_SYNC'; rankings: RankEntry[]; scores: Record<string, Record<string, number>>; rematchVotes: string[] };
 
 const EMPTY_HELD: boolean[] = [false, false, false, false, false];
 
@@ -114,6 +116,10 @@ function reducer(state: GameState, action: GameAction): GameState {
       return { ...initialState, nickname: '' };
     case 'CLEAR_LAST_SCORED':
       return { ...state, lastScored: null };
+    case 'ROOM_SYNC':
+      return { ...state, phase: 'room', roomCode: action.roomCode, players: action.players };
+    case 'RESULT_SYNC':
+      return { ...state, phase: 'result', rankings: action.rankings, scores: action.scores, rematchVotes: action.rematchVotes };
     default:
       return state;
   }

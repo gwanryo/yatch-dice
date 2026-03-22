@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"yacht-dice-server/message"
 	"yacht-dice-server/player"
 )
 
@@ -364,7 +365,7 @@ func TestRematch(t *testing.T) {
 	rm.AddPlayer(p1)
 	rm.AddPlayer(p2)
 	rm.StartGame()
-	rm.EndGame()
+	rm.EndGame(nil)
 
 	allVoted := rm.Rematch("p1")
 	if allVoted {
@@ -395,9 +396,18 @@ func TestBroadcastState(t *testing.T) {
 
 func TestSyncPayloadNoEngine(t *testing.T) {
 	rm := New("TEST01", "")
+	p1 := newMockPlayer("p1", "Alice")
+	rm.AddPlayer(p1)
 	data := rm.SyncPayload()
-	if data != nil {
-		t.Error("expected nil sync payload when no game in progress")
+	if data == nil {
+		t.Fatal("waiting room should return room:sync, not nil")
+	}
+	var env struct {
+		Type string `json:"type"`
+	}
+	json.Unmarshal(data, &env)
+	if env.Type != "room:sync" {
+		t.Errorf("type = %s, want room:sync", env.Type)
 	}
 }
 
@@ -514,7 +524,7 @@ func TestRemovePlayerClearsRematchVote(t *testing.T) {
 
 	// Simulate end-of-game state
 	rm.StartGame()
-	rm.EndGame()
+	rm.EndGame(nil)
 
 	// p1 votes for rematch
 	rm.Rematch("p1")
@@ -542,7 +552,7 @@ func TestRematchWithSinglePlayerReturnsFalse(t *testing.T) {
 	rm.AddPlayer(p1)
 	rm.AddPlayer(p2)
 	rm.StartGame()
-	rm.EndGame()
+	rm.EndGame(nil)
 
 	// p2 leaves
 	rm.RemovePlayer("p2", func() {})
@@ -566,7 +576,7 @@ func TestRematchVotesAfterPlayerLeave(t *testing.T) {
 	rm.AddPlayer(p1)
 	rm.AddPlayer(p2)
 	rm.StartGame()
-	rm.EndGame()
+	rm.EndGame(nil)
 
 	// Both vote, but p1 leaves before p2 votes
 	rm.Rematch("p1")
@@ -601,5 +611,103 @@ func TestFindPlayer(t *testing.T) {
 	notFound := rm.FindPlayer("missing")
 	if notFound != nil {
 		t.Error("expected nil for missing player")
+	}
+}
+
+func TestHandleDisconnectWaiting(t *testing.T) {
+	rm := New("TEST01", "")
+	p1 := newMockPlayer("p1", "Alice")
+	p2 := newMockPlayer("p2", "Bob")
+	rm.AddPlayer(p1)
+	rm.AddPlayer(p2)
+
+	called := false
+	rm.HandleDisconnectWaiting("p2", func() { called = true })
+
+	// Reconnect before timeout — callback should NOT fire
+	rm.HandleReconnect("p2")
+	if called {
+		t.Error("callback should not have fired after reconnect")
+	}
+}
+
+func TestSyncPayloadWaiting(t *testing.T) {
+	rm := New("TEST02", "")
+	p1 := newMockPlayer("p1", "Alice")
+	rm.AddPlayer(p1)
+
+	data := rm.SyncPayload()
+	if data == nil {
+		t.Fatal("SyncPayload should return data for waiting room")
+	}
+	var env struct {
+		Type    string          `json:"type"`
+		Payload json.RawMessage `json:"payload"`
+	}
+	if err := json.Unmarshal(data, &env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Type != "room:sync" {
+		t.Errorf("type = %s, want room:sync", env.Type)
+	}
+}
+
+func TestSyncPayloadFinished(t *testing.T) {
+	rm := New("TEST03", "")
+	p1 := newMockPlayer("p1", "Alice")
+	p2 := newMockPlayer("p2", "Bob")
+	rm.AddPlayer(p1)
+	rm.AddPlayer(p2)
+	rm.StartGame()
+
+	rankings := []message.RankEntry{
+		{PlayerID: "p1", Nickname: "Alice", Score: 100, Rank: 1},
+		{PlayerID: "p2", Nickname: "Bob", Score: 80, Rank: 2},
+	}
+	rm.EndGame(rankings)
+
+	data := rm.SyncPayload()
+	if data == nil {
+		t.Fatal("SyncPayload should return data for finished room")
+	}
+	var env struct {
+		Type    string          `json:"type"`
+		Payload json.RawMessage `json:"payload"`
+	}
+	if err := json.Unmarshal(data, &env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Type != "result:sync" {
+		t.Errorf("type = %s, want result:sync", env.Type)
+	}
+	var payload message.ResultSyncPayload
+	if err := json.Unmarshal(env.Payload, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload.Rankings) != 2 {
+		t.Errorf("rankings len = %d, want 2", len(payload.Rankings))
+	}
+}
+
+func TestSyncPayloadPlaying(t *testing.T) {
+	rm := New("TEST04", "")
+	p1 := newMockPlayer("p1", "Alice")
+	p2 := newMockPlayer("p2", "Bob")
+	rm.AddPlayer(p1)
+	rm.AddPlayer(p2)
+	rm.StartGame()
+
+	data := rm.SyncPayload()
+	if data == nil {
+		t.Fatal("SyncPayload should return data for playing room")
+	}
+	var env struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(data, &env); err != nil {
+		t.Fatal(err)
+	}
+	if env.Type != "game:sync" {
+		t.Errorf("type = %s, want game:sync", env.Type)
 	}
 }

@@ -6,6 +6,7 @@ import type {
   RoomState, GameRolledPayload, GameScoredPayload,
   GameTurnPayload, GameSyncPayload, GameEndPayload,
   ReactionShowPayload, GameHeldPayload, GameHoveredPayload,
+  ResultSyncPayload,
 } from '../types/game';
 
 type WS = ReturnType<typeof useWebSocket>;
@@ -61,6 +62,14 @@ export function useGameEvents(
       ws.on('game:sync', (env) => {
         const p = env.payload as GameSyncPayload;
         dispatch({ type: 'GAME_SYNC', ...p });
+      }),
+      ws.on('room:sync', (env) => {
+        const p = env.payload as RoomState;
+        dispatch({ type: 'ROOM_SYNC', roomCode: p.roomCode, players: p.players });
+      }),
+      ws.on('result:sync', (env) => {
+        const p = env.payload as ResultSyncPayload;
+        dispatch({ type: 'RESULT_SYNC', rankings: p.rankings, scores: p.scores, rematchVotes: p.rematchVotes });
       }),
       ws.on('game:end', (env) => {
         const p = env.payload as GameEndPayload;
