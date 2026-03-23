@@ -10,7 +10,7 @@ export function useWebSocket(nickname: string) {
   const [connectionFailed, setConnectionFailed] = useState(false);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const playerIdRef = useRef<string | null>(null);
-  const tokenRef = useRef<string | null>(null);
+  const tokenRef = useRef<string | null>(sessionStorage.getItem('ws_token'));
   const nicknameRef = useRef(nickname);
   const handlersRef = useRef<Map<string, MessageHandler[]>>(new Map());
   const queueRef = useRef<string[]>([]);
@@ -84,7 +84,9 @@ export function useWebSocket(nickname: string) {
           setPlayerId(payload.playerId);
           playerIdRef.current = payload.playerId;
           tokenRef.current = payload.token;
+          sessionStorage.setItem('ws_token', payload.token);
           if (idChanged && onSessionResetRef.current) {
+            sessionStorage.removeItem('ws_token');
             onSessionResetRef.current();
           }
         }
@@ -132,6 +134,7 @@ export function useWebSocket(nickname: string) {
 
   const disconnect = useCallback(() => {
     retriesRef.current = maxRetries;
+    sessionStorage.removeItem('ws_token');
     wsRef.current?.close();
   }, []);
 

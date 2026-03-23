@@ -83,6 +83,8 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
   const _nl = new CANNON.Vec3();
   const _nudgeForce = new CANNON.Vec3();
   const _nudgePoint = new CANNON.Vec3();
+  const _cupDown = new CANNON.Vec3();
+  const _extraG = new CANNON.Vec3();
   const _identityQ = new CANNON.Quaternion(0, 0, 0, 1);
 
   /* ── Held dice ── */
@@ -196,7 +198,7 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
       const maxR = CUP_BR + (CUP_TR - CUP_BR) * t - DICE_HALF - 0.15;
       const r = Math.sqrt(_local.x * _local.x + _local.z * _local.z);
       if (r > maxR || _local.y < -0.5 || _local.y > CUP_H + 0.5) {
-        _nl.set((Math.random() - 0.5) * 0.4, CUP_H * 0.3, (Math.random() - 0.5) * 0.4);
+        _nl.set((Math.random() - 0.5) * 0.2, DICE_HALF + 0.05, (Math.random() - 0.5) * 0.2);
         cupBody.quaternion.vmult(_nl, _rel);
         _rel.vadd(cupBody.position, _rel);
         body.position.copy(_rel);
@@ -256,14 +258,28 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
     cupBody.position.set(cupRestPos.x + px, LIFT_HEIGHT + bounceY, cupRestPos.z + pz);
     cupBody.quaternion.setFromEuler(rx, ry, rz);
 
+    // Cup-local gravity: push dice toward cup floor even when tilted
+    _cupDown.set(0, -1, 0);
+    cupBody.quaternion.vmult(_cupDown, _cupDown);
+    diceBodies.forEach((b, i) => {
+      if (heldDice[i]) return;
+      _extraG.copy(_cupDown);
+      _extraG.scale(b.mass * 9.82 * 0.7, _extraG);
+      b.applyForce(_extraG, b.position);
+    });
+
+    // Nudge — scaled by active dice count so fewer dice get weaker impulses
+    const activeDiceCount = diceBodies.reduce((n, _, i) => n + (heldDice[i] ? 0 : 1), 0);
+    const nudgeScale = Math.min(activeDiceCount / 3, 1.0);
+
     if (se % SHAKE_NUDGE_INTERVAL < 17) {
       diceBodies.forEach((b, i) => {
         if (heldDice[i]) return;
         if (b.velocity.length() < 3) {
           _nudgeForce.set(
-            (Math.random() - 0.5) * SHAKE_NUDGE_FORCE,
-            SHAKE_NUDGE_LIFT,
-            (Math.random() - 0.5) * SHAKE_NUDGE_FORCE,
+            (Math.random() - 0.5) * SHAKE_NUDGE_FORCE * nudgeScale,
+            SHAKE_NUDGE_LIFT * nudgeScale * 0.5,
+            (Math.random() - 0.5) * SHAKE_NUDGE_FORCE * nudgeScale,
           );
           b.applyImpulse(_nudgeForce, _nudgePoint);
         }
@@ -299,6 +315,34 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
 
   let settleStart = 0;
   let settleTargetCannonQ: CANNON.Quaternion[] = [];
+
+  /* ── Cup exit animation ── */
+  let cupExiting = false;
+  let cupExitStart = 0;
+  const CUP_EXIT_DUR = 450;
+  const cupExitFromPos = new THREE.Vector3();
+  const cupExitFromQ = new THREE.Quaternion();
+
+  function updateCupExit() {
+    if (!cupExiting) return;
+    const t = Math.min((performance.now() - cupExitStart) / CUP_EXIT_DUR, 1);
+    const e = 1 - Math.pow(1 - t, 3); // ease-out cubic
+    cupGroup.position.lerpVectors(
+      cupExitFromPos,
+      cupExitFromPos.clone().add(new THREE.Vector3(-4, 3, 0)),
+      e,
+    );
+    cupGroup.quaternion.slerpQuaternions(
+      cupExitFromQ,
+      cupExitFromQ.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -0.4))),
+      e,
+    );
+    if (t >= 1) {
+      cupExiting = false;
+      cupGroup.position.set(-8, 0, 0);
+      cupGroup.quaternion.set(0, 0, 0, 1);
+    }
+  }
 
   function updateRoll() {
     const elapsed = performance.now() - rollStart;
@@ -344,8 +388,11 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
       cupBody.quaternion.setFromEuler(0, 0, tiltAngle);
       if (t >= 1) {
         world.removeBody(cupBody);
-        cupGroup.position.set(-8, 0, 0);
-        cupGroup.quaternion.set(0, 0, 0, 1);
+        // Start cup exit animation instead of instant teleport
+        cupExiting = true;
+        cupExitStart = performance.now();
+        cupExitFromPos.copy(cupGroup.position);
+        cupExitFromQ.copy(cupGroup.quaternion);
         settleStart = performance.now();
         settleTargetCannonQ = targetVals.map(val => {
           const yaw = Math.random() * Math.PI * 2;
@@ -528,7 +575,9 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
         diceMeshes[i].quaternion.copy(diceBodies[i].quaternion as unknown as THREE.Quaternion);
       }
     }
-    if ((cupBody as CANNON.Body & { world: CANNON.World | null }).world) {
+    if (cupExiting) {
+      updateCupExit();
+    } else if ((cupBody as CANNON.Body & { world: CANNON.World | null }).world) {
       cupGroup.position.copy(cupBody.position as unknown as THREE.Vector3);
       cupGroup.quaternion.copy(cupBody.quaternion as unknown as THREE.Quaternion);
     }

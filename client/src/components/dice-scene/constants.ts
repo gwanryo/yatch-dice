@@ -23,7 +23,7 @@ export const WALL_RINGS = 6;
 export const WALL_DEPTH = 0.35;
 
 // Shake motion parameters — tuned for exciting, snappy feel
-export const SHAKE_SWIRL_SPEED = 0.014;
+export const SHAKE_SWIRL_SPEED = 0.012;
 export const SHAKE_CIRCLE_R = 0.65;
 export const SHAKE_CIRCLE_R_VAR = 0.18;
 export const SHAKE_TILT_BASE = 0.30;

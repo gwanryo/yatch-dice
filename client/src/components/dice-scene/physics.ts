@@ -68,15 +68,13 @@ export function createPhysicsWorld(dicePositions: [number, number, number][]): P
       cupBody.addShape(sh, off, q);
     }
   }
-  const botR = CUP_BR + 0.3, botH = 0.5;
-  for (let i = 0; i < 5; i++) {
-    const q = new CANNON.Quaternion();
-    q.setFromEuler(0, (i / 5) * Math.PI, 0);
-    cupBody.addShape(
-      new CANNON.Box(new CANNON.Vec3(botR * (1 - i * 0.08), botH, botR * (1 - i * 0.08))),
-      new CANNON.Vec3(0, 0, 0), q,
-    );
-  }
+  // Single cylinder floor — prevents dice from clipping through gaps
+  const botR = CUP_BR + 0.1;
+  const botH = 0.3;
+  cupBody.addShape(
+    new CANNON.Cylinder(botR, botR, botH, 16),
+    new CANNON.Vec3(0, -botH / 2, 0),
+  );
   world.addBody(cupBody);
   world.addContactMaterial(new CANNON.ContactMaterial(dMat, cupPhysMat, { friction: 0.5, restitution: 0.2 }));
 

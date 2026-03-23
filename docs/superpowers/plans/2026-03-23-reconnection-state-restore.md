@@ -74,7 +74,7 @@ rm.EndGame()  →  rm.EndGame(nil)
 
 - [ ] **Step 5: Run Go tests**
 
-Run: `cd /Users/ryo/Personal/yatch-dice/server && go test ./...`
+Run: `cd /Users/ryo/Personal/yacht-dice/server && go test ./...`
 Expected: All pass.
 
 - [ ] **Step 6: Commit**
@@ -159,7 +159,7 @@ func (wh *WSHandler) handleDisconnect(p *player.Player) {
 
 - [ ] **Step 3: Run Go tests**
 
-Run: `cd /Users/ryo/Personal/yatch-dice/server && go test ./...`
+Run: `cd /Users/ryo/Personal/yacht-dice/server && go test ./...`
 Expected: All pass.
 
 - [ ] **Step 4: Commit**
@@ -279,7 +279,7 @@ func TestSyncPayloadNoEngine(t *testing.T) {
 
 - [ ] **Step 5: Run Go tests**
 
-Run: `cd /Users/ryo/Personal/yatch-dice/server && go test ./...`
+Run: `cd /Users/ryo/Personal/yacht-dice/server && go test ./...`
 Expected: All pass.
 
 - [ ] **Step 6: Commit**
@@ -410,12 +410,12 @@ Ensure `"yacht-dice-server/message"` is in the imports of `room_test.go`.
 
 - [ ] **Step 3: Run Go tests**
 
-Run: `cd /Users/ryo/Personal/yatch-dice/server && go test ./room/ -v -run "TestHandleDisconnect|TestSyncPayload"`
+Run: `cd /Users/ryo/Personal/yacht-dice/server && go test ./room/ -v -run "TestHandleDisconnect|TestSyncPayload"`
 Expected: All 4 new tests pass.
 
 - [ ] **Step 4: Run full Go test suite**
 
-Run: `cd /Users/ryo/Personal/yatch-dice/server && go test ./...`
+Run: `cd /Users/ryo/Personal/yacht-dice/server && go test ./...`
 Expected: All pass.
 
 - [ ] **Step 5: Commit**
@@ -483,7 +483,7 @@ In `client/src/hooks/useGameEvents.ts`, add the `ResultSyncPayload` import from 
 
 - [ ] **Step 4: Run client tests**
 
-Run: `cd /Users/ryo/Personal/yatch-dice/client && npx vitest run`
+Run: `cd /Users/ryo/Personal/yacht-dice/client && npx vitest run`
 Expected: All pass (no regressions).
 
 - [ ] **Step 5: Commit**
@@ -540,7 +540,7 @@ Note: Adapt the test helper pattern to match the existing `useGameState.test.ts`
 
 - [ ] **Step 2: Run tests**
 
-Run: `cd /Users/ryo/Personal/yatch-dice/client && npx vitest run src/hooks/useGameState.test.ts`
+Run: `cd /Users/ryo/Personal/yacht-dice/client && npx vitest run src/hooks/useGameState.test.ts`
 Expected: All pass.
 
 - [ ] **Step 3: Commit**
@@ -582,7 +582,7 @@ Add `testReconnectionInRoom()` that:
 
 - [ ] **Step 3: Run WebSocket E2E tests**
 
-Run: `cd /Users/ryo/Personal/yatch-dice && node e2e-test.mjs`
+Run: `cd /Users/ryo/Personal/yacht-dice && node e2e-test.mjs`
 Expected: All tests pass including the new reconnection tests.
 
 - [ ] **Step 4: Commit**
@@ -598,17 +598,17 @@ git commit -m "test(e2e): 게임 중/대기실 재연결 WebSocket E2E 테스트
 
 - [ ] **Step 1: Run all Go tests**
 
-Run: `cd /Users/ryo/Personal/yatch-dice/server && go test ./...`
+Run: `cd /Users/ryo/Personal/yacht-dice/server && go test ./...`
 Expected: All pass.
 
 - [ ] **Step 2: Run all client tests**
 
-Run: `cd /Users/ryo/Personal/yatch-dice/client && npx vitest run`
+Run: `cd /Users/ryo/Personal/yacht-dice/client && npx vitest run`
 Expected: All pass.
 
 - [ ] **Step 3: Run WebSocket E2E tests**
 
-Run: `cd /Users/ryo/Personal/yatch-dice && node e2e-test.mjs`
+Run: `cd /Users/ryo/Personal/yacht-dice && node e2e-test.mjs`
 Expected: All pass.
 
 - [ ] **Step 4: Squash into single commit**

@@ -21,7 +21,7 @@
 - [ ] **Step 1: Initialize git and make first commit**
 
 ```bash
-cd "C:/Users/USER/Desktop/Work/WebstormProjects/yatch-dice" && git init && git add .gitignore && git commit -m "chore: initial commit"
+cd "C:/Users/USER/Desktop/Work/WebstormProjects/yacht-dice" && git init && git add .gitignore && git commit -m "chore: initial commit"
 ```
 
 - [ ] **Step 2: Create server and client directories**
@@ -1815,7 +1815,7 @@ git commit -m "feat: add main entry point with Chi router"
 - [ ] **Step 1: Create Vite React TypeScript project**
 
 ```bash
-cd "C:/Users/USER/Desktop/Work/WebstormProjects/yatch-dice" && npm create vite@latest client -- --template react-ts
+cd "C:/Users/USER/Desktop/Work/WebstormProjects/yacht-dice" && npm create vite@latest client -- --template react-ts
 ```
 
 - [ ] **Step 2: Install dependencies**
@@ -2674,7 +2674,7 @@ export default function DiceArea({ dice, held, rollPhase, onHold, onSettled }: P
 - [ ] **Step 2: Copy 3D dice HTML to client public dir**
 
 ```bash
-cp "C:/Users/USER/Desktop/Work/Dice/index.html" "C:/Users/USER/Desktop/Work/WebstormProjects/yatch-dice/client/public/dice3d.html"
+cp "C:/Users/USER/Desktop/Work/Dice/index.html" "C:/Users/USER/Desktop/Work/WebstormProjects/yacht-dice/client/public/dice3d.html"
 ```
 
 - [ ] **Step 3: Commit**

@@ -203,7 +203,7 @@ describe('GamePage hand announcement timing', () => {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /Users/ryo/Personal/yatch-dice/client && npx vitest run src/pages/GamePage.test.tsx`
+Run: `cd /Users/ryo/Personal/yacht-dice/client && npx vitest run src/pages/GamePage.test.tsx`
 
 Expected: At least the first test ("should NOT show hand announcement immediately after GAME_ROLLED") should FAIL because the current code's `useEffect` triggers on `state.dice` change while `rollPhase` is still `'settled'`.
 
@@ -311,13 +311,13 @@ Example pattern for each:
 
 - [ ] **Step 6: Run tests to verify they pass**
 
-Run: `cd /Users/ryo/Personal/yatch-dice/client && npx vitest run src/pages/GamePage.test.tsx`
+Run: `cd /Users/ryo/Personal/yacht-dice/client && npx vitest run src/pages/GamePage.test.tsx`
 
 Expected: ALL tests pass.
 
 - [ ] **Step 7: Run full test suite to check for regressions**
 
-Run: `cd /Users/ryo/Personal/yatch-dice/client && npx vitest run`
+Run: `cd /Users/ryo/Personal/yacht-dice/client && npx vitest run`
 
 Expected: All existing tests pass (including GamePage.opponent.test.tsx).
 

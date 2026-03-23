@@ -1,1 +1,1 @@
-# yatch-dice
+# yacht-dice
