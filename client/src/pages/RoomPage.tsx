@@ -80,8 +80,8 @@ export default function RoomPage({ state, dispatch, send, playerId }: Props) {
               )}
             </div>
           ))}
-          {state.players.length < 2 && (
-            <p className="text-center text-gray-500 text-sm py-2">{t('room.waitingForPlayers')}</p>
+          {state.players.length === 1 && (
+            <p className="text-center text-gray-500 text-sm py-2">{t('room.soloReady')}</p>
           )}
         </div>
 
@@ -93,7 +93,7 @@ export default function RoomPage({ state, dispatch, send, playerId }: Props) {
             <Button onClick={() => send('room:start')}
               onMouseEnter={preloadDiceScene}
               onFocus={preloadDiceScene}
-              disabled={state.players.length < 2 || !allOthersReady}
+              disabled={state.players.length < 1 || !allOthersReady}
               className="flex-1">
               {t('room.start')}
             </Button>

@@ -584,8 +584,8 @@ func (wh *WSHandler) handleRematch(p *player.Player) {
 	if rm == nil {
 		return
 	}
-	// Don't allow rematch with fewer than 2 players
-	if rm.PlayerCount() < 2 {
+	// Don't allow rematch with no players
+	if rm.PlayerCount() < 1 {
 		return
 	}
 	rm.CancelRematchTimer()

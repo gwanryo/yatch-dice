@@ -27,6 +27,7 @@
     "leave": "나가기",
     "host": "방장",
     "waitingForPlayers": "플레이어를 기다리는 중\u2026",
+    "soloReady": "바로 시작하거나 다른 플레이어를 기다리세요",
     "allReady": "모든 플레이어가 준비되었습니다",
     "copyFailed": "복사에 실패했습니다"
   },
@@ -59,8 +60,12 @@
     "title": "게임 결과",
     "rankLabel": "{{rank}}등",
     "rematch": "다시하기",
+    "playAgain": "다시 하기",
     "opponentLeft": "상대가 나갔습니다",
-    "backToLobby": "로비로"
+    "backToLobby": "로비로",
+    "soloScore": "내 점수",
+    "personalBest": "최고 기록",
+    "newPersonalBest": "새 최고 기록!"
   },
   "error": {
     "webglNotSupported": "WebGL을 지원하지 않는 브라우저입니다",

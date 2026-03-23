@@ -27,6 +27,7 @@
     "leave": "Leave",
     "host": "Host",
     "waitingForPlayers": "Waiting for players\u2026",
+    "soloReady": "Start solo or wait for others to join",
     "allReady": "All players ready",
     "copyFailed": "Copy failed"
   },
@@ -59,8 +60,12 @@
     "title": "Game Results",
     "rankLabel": "{{rank}} Place",
     "rematch": "Rematch",
+    "playAgain": "Play Again",
     "opponentLeft": "Opponent Left",
-    "backToLobby": "Back to Lobby"
+    "backToLobby": "Back to Lobby",
+    "soloScore": "Your Score",
+    "personalBest": "Personal Best",
+    "newPersonalBest": "New Personal Best!"
   },
   "error": {
     "webglNotSupported": "Your browser does not support WebGL",

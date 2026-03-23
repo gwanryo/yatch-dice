@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import PageLayout from '../components/PageLayout';
 import Button from '../components/Button';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { saveHighScore } from '../utils/highScore';
 import type { GameState, GameAction } from '../hooks/useGameState';
 
 const CONFETTI_COLORS = ['#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
@@ -55,8 +56,22 @@ export default function ResultPage({ state, dispatch, send, playerId }: Props) {
   const [showConfetti, setShowConfetti] = useState(false);
   const [announced, setAnnounced] = useState('');
 
+  const isSolo = state.players.length === 1;
+
+  // High score tracking for solo mode
+  const highScoreResult = useMemo(() => {
+    if (!isSolo || state.rankings.length === 0) return null;
+    return saveHighScore(state.rankings[0].score);
+  }, [isSolo, state.rankings]);
+
   // Stagger ranking reveals
   useEffect(() => {
+    if (isSolo) {
+      // Solo: reveal immediately
+      setRevealed(1);
+      const timer = setTimeout(() => setShowConfetti(highScoreResult?.isNewBest ?? false), 400);
+      return () => clearTimeout(timer);
+    }
     if (revealed < state.rankings.length) {
       const timer = setTimeout(() => {
         setRevealed(prev => prev + 1);
@@ -69,10 +84,10 @@ export default function ResultPage({ state, dispatch, send, playerId }: Props) {
       const timer = setTimeout(() => setShowConfetti(true), 200);
       return () => clearTimeout(timer);
     }
-  }, [revealed, state.rankings.length, state.rankings, formatRank]);
+  }, [revealed, state.rankings.length, state.rankings, formatRank, isSolo, highScoreResult]);
 
   const myVoted = playerId ? state.rematchVotes.includes(playerId) : false;
-  const canRematch = state.players.length >= 2;
+  const canRematch = state.players.length >= 1;
 
   const [confirmLeave, setConfirmLeave] = useState(false);
 
@@ -86,6 +101,8 @@ export default function ResultPage({ state, dispatch, send, playerId }: Props) {
     dispatch({ type: 'RESET_GAME' });
   };
 
+  const soloScore = isSolo && state.rankings.length > 0 ? state.rankings[0].score : 0;
+
   return (
     <PageLayout phase="result" className="relative overflow-hidden">
       {/* Confetti particles */}
@@ -97,36 +114,60 @@ export default function ResultPage({ state, dispatch, send, playerId }: Props) {
         <h1 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-300 text-center drop-shadow-lg" style={{ fontFamily: '"Outfit", system-ui, sans-serif' }}>
           {t('result.title')}
         </h1>
-        <div className="space-y-3">
-          {state.rankings.map((r, i) => (
-            <div
-              key={r.playerId}
-              className={`flex items-center justify-between p-4 rounded-xl border transition-[opacity,transform] duration-500 ${
-                i < revealed
-                  ? 'opacity-100 translate-y-0'
-                  : 'opacity-0 translate-y-4'
-              } ${
-                i === 0
-                  ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/10 border-amber-500/50 animate-winner-glow scale-[1.02] ring-1 ring-amber-400/20'
-                  : i === 1
-                    ? 'bg-gradient-to-r from-gray-400/10 to-gray-300/5 border-gray-400/20'
-                    : i === 2
-                      ? 'bg-gradient-to-r from-orange-700/10 to-orange-600/5 border-orange-700/20'
-                      : 'bg-black/30 border-white/5'
-              }`}
-              style={{ transitionDelay: `${i * 400}ms` }}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <span className={`shrink-0 ${i === 0 ? 'text-3xl' : 'text-2xl'}`}>{medals[i] ?? ''}</span>
-                <div className="min-w-0">
-                  <p className={`font-bold truncate ${i === 0 ? 'text-amber-200 text-lg' : 'text-white'}`}>{r.nickname}</p>
-                  <p className="text-gray-400 text-sm">{t('result.rankLabel', { rank: formatRank(r.rank) })}</p>
-                </div>
-              </div>
-              <span className={`font-bold tabular-nums shrink-0 ${i === 0 ? 'text-3xl text-amber-300' : 'text-2xl text-white'}`}>{r.score}</span>
+
+        {isSolo ? (
+          /* Solo result view */
+          <div className="space-y-4">
+            <div className={`text-center p-6 rounded-xl border transition-[opacity,transform] duration-500 ${
+              revealed > 0 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            } bg-gradient-to-r from-amber-500/20 to-yellow-500/10 border-amber-500/50 ring-1 ring-amber-400/20`}>
+              <p className="text-gray-400 text-sm mb-1">{t('result.soloScore')}</p>
+              <p className="text-5xl font-bold text-amber-300 tabular-nums">{soloScore}</p>
+              {highScoreResult?.isNewBest ? (
+                <p className="mt-3 text-lg font-bold text-yellow-300 animate-pulse">
+                  {t('result.newPersonalBest')}
+                </p>
+              ) : highScoreResult?.previous ? (
+                <p className="mt-3 text-sm text-gray-400">
+                  {t('result.personalBest')}: <span className="text-white font-bold">{highScoreResult.previous.score}</span>
+                </p>
+              ) : null}
             </div>
-          ))}
-        </div>
+          </div>
+        ) : (
+          /* Multiplayer ranking view */
+          <div className="space-y-3">
+            {state.rankings.map((r, i) => (
+              <div
+                key={r.playerId}
+                className={`flex items-center justify-between p-4 rounded-xl border transition-[opacity,transform] duration-500 ${
+                  i < revealed
+                    ? 'opacity-100 translate-y-0'
+                    : 'opacity-0 translate-y-4'
+                } ${
+                  i === 0
+                    ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/10 border-amber-500/50 animate-winner-glow scale-[1.02] ring-1 ring-amber-400/20'
+                    : i === 1
+                      ? 'bg-gradient-to-r from-gray-400/10 to-gray-300/5 border-gray-400/20'
+                      : i === 2
+                        ? 'bg-gradient-to-r from-orange-700/10 to-orange-600/5 border-orange-700/20'
+                        : 'bg-black/30 border-white/5'
+                }`}
+                style={{ transitionDelay: `${i * 400}ms` }}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className={`shrink-0 ${i === 0 ? 'text-3xl' : 'text-2xl'}`}>{medals[i] ?? ''}</span>
+                  <div className="min-w-0">
+                    <p className={`font-bold truncate ${i === 0 ? 'text-amber-200 text-lg' : 'text-white'}`}>{r.nickname}</p>
+                    <p className="text-gray-400 text-sm">{t('result.rankLabel', { rank: formatRank(r.rank) })}</p>
+                  </div>
+                </div>
+                <span className={`font-bold tabular-nums shrink-0 ${i === 0 ? 'text-3xl text-amber-300' : 'text-2xl text-white'}`}>{r.score}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="flex gap-3">
           <Button
             onClick={() => { send('game:rematch'); }}
@@ -137,7 +178,9 @@ export default function ResultPage({ state, dispatch, send, playerId }: Props) {
               ? t('result.opponentLeft')
               : myVoted
                 ? `${t('result.rematch')} (${state.rematchVotes.length}/${state.players.length})`
-                : t('result.rematch')
+                : isSolo
+                  ? t('result.playAgain')
+                  : t('result.rematch')
             }
           </Button>
           <Button variant="ghost" onClick={() => setConfirmLeave(true)} className="flex-1">

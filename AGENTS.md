@@ -17,7 +17,7 @@ All tasks MUST begin by invoking the `using-superpowers` skill.
 ```bash
 cd client && npm test          # 유닛 테스트
 cd server && go test ./...     # 서버 테스트
-./e2e/run-e2e.sh               # E2E (agent-browser 필요)
+DISABLE_RATE_LIMIT=true go run . & node e2e-test.mjs  # E2E
 ```
 
 모두 통과해야 함. 기존 테스트를 통과시키기 위해 수정 금지.

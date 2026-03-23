@@ -1153,6 +1153,75 @@ async function testHoldIndexValidation() {
   await sleep(200);
 }
 
+async function testSoloGame() {
+  console.log('\n=== TEST: Solo Game (1-Player Full Game + Rematch) ===');
+
+  const p1 = await connectPlayer('SoloPlayer');
+  assert(p1.id && p1.id.length > 0, 'Solo player connected with ID');
+
+  // Create room
+  p1.send('room:create', {});
+  const created = await p1.waitFor('room:created');
+  const roomCode = created.payload.roomCode;
+  assert(roomCode && roomCode.length === 6, `Room created: ${roomCode}`);
+  await p1.waitFor('room:state');
+
+  // Start game alone (no ready needed, host starts directly)
+  p1.send('room:start');
+  const startMsg = await p1.waitFor('game:start');
+  assert(startMsg.payload.playerOrder.length === 1, 'Solo game started with 1 player');
+  assert(startMsg.payload.playerOrder[0] === p1.id, 'Solo player is in order');
+
+  // Get initial turn
+  const turn0 = await p1.waitFor('game:turn');
+  assert(turn0.payload.round === 1, 'Game starts at round 1');
+  assert(turn0.payload.currentPlayer === p1.id, 'Solo player gets first turn');
+
+  // Play all 12 rounds
+  for (let round = 1; round <= 12; round++) {
+    // Roll dice
+    p1.send('game:roll', { held: [] });
+    const rolled = await p1.waitFor('game:rolled');
+    assert(rolled.payload.dice.length === 5, `Solo R${round}: Rolled 5 dice`);
+
+    // Score category
+    const cat = CATEGORIES[round - 1];
+    p1.send('game:score', { category: cat });
+    const scored = await p1.waitFor('game:scored');
+    assert(scored.payload.category === cat, `Solo R${round}: Scored ${cat}`);
+
+    if (round === 12) {
+      // Last round - game should end
+      const endMsg = await p1.waitFor('game:end');
+      assert(endMsg.payload.rankings.length === 1, 'Solo game ended with 1 ranking');
+      assert(endMsg.payload.rankings[0].rank === 1, 'Solo player is rank 1');
+      assert(endMsg.payload.rankings[0].nickname === 'SoloPlayer', 'Ranking has correct nickname');
+      assert(endMsg.payload.rankings[0].score > 0, 'Solo player has a score');
+    } else {
+      const turnMsg = await p1.waitFor('game:turn');
+      assert(turnMsg.payload.round === round + 1, `Solo: Advanced to round ${round + 1}`);
+      assert(turnMsg.payload.currentPlayer === p1.id, 'Solo player always has the turn');
+    }
+  }
+
+  // Test solo rematch - should complete instantly with 1 vote
+  p1.send('game:rematch');
+  const rematchStart = await p1.waitFor('rematch:start');
+  assert(rematchStart.payload !== undefined, 'Solo rematch triggers instantly');
+
+  // After rematch, should receive room:state (back to waiting)
+  const roomState = await p1.waitFor('room:state');
+  assert(roomState.payload.players.length === 1, 'Solo rematch: back to waiting with 1 player');
+
+  // Can start another game
+  p1.send('room:start');
+  const startMsg2 = await p1.waitFor('game:start');
+  assert(startMsg2.payload.playerOrder.length === 1, 'Second solo game started');
+
+  p1.close();
+  await sleep(300);
+}
+
 // ====== RUN ALL TESTS ======
 async function main() {
   console.log('🎲 Yacht Dice E2E Test Suite\n');
@@ -1161,6 +1230,7 @@ async function main() {
 
   const tests = [
     testFullGame,
+    testSoloGame,
     testInvalidPayload,
     testNicknameValidation,
     testAlreadyInRoom,

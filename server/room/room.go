@@ -151,7 +151,7 @@ func (r *Room) ToggleReady(playerID string) {
 func (r *Room) CanStart(playerID string) bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	if playerID != r.hostID || len(r.players) < 2 || r.status == "playing" {
+	if playerID != r.hostID || len(r.players) < 1 || r.status == "playing" {
 		return false
 	}
 	for _, p := range r.players {
@@ -272,12 +272,12 @@ func (r *Room) EndGame(rankings []message.RankEntry) {
 }
 
 // Rematch records a player's rematch vote. Returns true if all players voted.
-// Requires at least 2 players to prevent solo rematch after other player leaves.
+// Solo mode: a single player's vote is sufficient to trigger rematch.
 func (r *Room) Rematch(playerID string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.rematch[playerID] = true
-	if len(r.players) >= 2 && len(r.rematch) >= len(r.players) {
+	if len(r.players) >= 1 && len(r.rematch) >= len(r.players) {
 		r.status = "waiting"
 		r.engine = nil
 		r.ready = make(map[string]bool)

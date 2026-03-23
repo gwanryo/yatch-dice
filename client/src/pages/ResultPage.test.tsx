@@ -9,6 +9,11 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+vi.mock('../utils/highScore', () => ({
+  saveHighScore: () => ({ isNewBest: true, previous: null }),
+  getHighScore: () => null,
+}));
+
 const baseState = {
   phase: 'result' as const,
   nickname: 'Me',
@@ -146,44 +151,33 @@ describe('back to lobby', () => {
   });
 });
 
-describe('rematch button with insufficient players', () => {
-  it('disables rematch button when only 1 player remains', () => {
-    const singlePlayerState = {
-      ...baseState,
-      players: [{ id: 'me', nickname: 'Me', isHost: true, isReady: false }],
-    };
-    render(<ResultPage state={singlePlayerState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />);
+describe('solo mode result', () => {
+  const soloState = {
+    ...baseState,
+    players: [{ id: 'me', nickname: 'Me', isHost: true, isReady: false }],
+    rankings: [{ playerId: 'me', nickname: 'Me', score: 200, rank: 1 }],
+  };
+
+  it('shows play again button for solo player', () => {
+    render(<ResultPage state={soloState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />);
     const buttons = screen.getAllByRole('button');
-    // When opponent left, button shows 'result.opponentLeft' instead of 'result.rematch'
-    const rematchBtn = buttons.find(b =>
-      b.textContent?.includes('result.rematch') || b.textContent?.includes('result.opponentLeft')
-    );
-    expect(rematchBtn).toBeTruthy();
-    expect(rematchBtn!).toBeDisabled();
+    const playAgainBtn = buttons.find(b => b.textContent?.includes('result.playAgain'));
+    expect(playAgainBtn).toBeTruthy();
+    expect(playAgainBtn!.disabled).toBe(false);
   });
 
-  it('shows opponent left label when only 1 player remains', () => {
-    const singlePlayerState = {
-      ...baseState,
-      players: [{ id: 'me', nickname: 'Me', isHost: true, isReady: false }],
-    };
-    render(<ResultPage state={singlePlayerState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />);
-    expect(screen.getByText('result.opponentLeft')).toBeTruthy();
-  });
-
-  it('does not send game:rematch when clicking disabled rematch button (solo player)', () => {
-    const singlePlayerState = {
-      ...baseState,
-      players: [{ id: 'me', nickname: 'Me', isHost: true, isReady: false }],
-    };
+  it('sends game:rematch when clicking play again in solo mode', () => {
     const send = vi.fn();
-    render(<ResultPage state={singlePlayerState} dispatch={vi.fn()} send={send} playerId="me" />);
+    render(<ResultPage state={soloState} dispatch={vi.fn()} send={send} playerId="me" />);
     const buttons = screen.getAllByRole('button');
-    const rematchBtn = buttons.find(b =>
-      b.textContent?.includes('result.opponentLeft')
-    );
-    // Disabled button click should not trigger send
-    fireEvent.click(rematchBtn!);
-    expect(send).not.toHaveBeenCalledWith('game:rematch');
+    const playAgainBtn = buttons.find(b => b.textContent?.includes('result.playAgain'));
+    fireEvent.click(playAgainBtn!);
+    expect(send).toHaveBeenCalledWith('game:rematch');
+  });
+
+  it('shows solo score display instead of rankings', () => {
+    render(<ResultPage state={soloState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />);
+    expect(screen.getByText('result.soloScore')).toBeTruthy();
+    expect(screen.getByText('200')).toBeTruthy();
   });
 });

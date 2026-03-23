@@ -27,6 +27,7 @@
     "leave": "退出",
     "host": "ホスト",
     "waitingForPlayers": "プレイヤーを待っています\u2026",
+    "soloReady": "ソロで開始するか他のプレイヤーを待ちましょう",
     "allReady": "全員準備完了",
     "copyFailed": "コピーに失敗しました"
   },
@@ -59,8 +60,12 @@
     "title": "ゲーム結果",
     "rankLabel": "{{rank}}位",
     "rematch": "もう一度",
+    "playAgain": "もう一回",
     "opponentLeft": "相手が退出しました",
-    "backToLobby": "ロビーへ"
+    "backToLobby": "ロビーへ",
+    "soloScore": "あなたのスコア",
+    "personalBest": "ハイスコア",
+    "newPersonalBest": "新記録！"
   },
   "error": {
     "webglNotSupported": "お使いのブラウザはWebGLに対応していません",

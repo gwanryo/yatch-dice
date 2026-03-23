@@ -190,13 +190,20 @@ func TestCanStartNotHost(t *testing.T) {
 	}
 }
 
-func TestCanStartTooFewPlayers(t *testing.T) {
+func TestCanStartSoloPlayer(t *testing.T) {
 	rm := New("TEST01", "")
 	p1 := newMockPlayer("p1", "Alice")
 	rm.AddPlayer(p1)
 
-	if rm.CanStart("p1") {
-		t.Error("should not start with only 1 player")
+	if !rm.CanStart("p1") {
+		t.Error("solo player (host) should be able to start")
+	}
+}
+
+func TestCanStartZeroPlayers(t *testing.T) {
+	rm := New("TEST01", "")
+	if rm.CanStart("nobody") {
+		t.Error("should not start with zero players")
 	}
 }
 
@@ -545,7 +552,7 @@ func TestRemovePlayerClearsRematchVote(t *testing.T) {
 	}
 }
 
-func TestRematchWithSinglePlayerReturnsFalse(t *testing.T) {
+func TestRematchWithSinglePlayerAfterLeave(t *testing.T) {
 	rm := New("TEST01", "")
 	p1 := newMockPlayer("p1", "Alice")
 	p2 := newMockPlayer("p2", "Bob")
@@ -557,15 +564,14 @@ func TestRematchWithSinglePlayerReturnsFalse(t *testing.T) {
 	// p2 leaves
 	rm.RemovePlayer("p2", func() {})
 
-	// p1 votes for rematch alone — should NOT trigger rematch start
+	// p1 votes for rematch alone — should trigger rematch (solo mode)
 	allVoted := rm.Rematch("p1")
-	if allVoted {
-		t.Error("rematch should not start with only 1 player")
+	if !allVoted {
+		t.Error("solo rematch should start with single remaining player")
 	}
 
-	// Status should remain "finished", not "waiting"
-	if rm.Status() != "finished" {
-		t.Errorf("status = %s, want finished (rematch should not reset with 1 player)", rm.Status())
+	if rm.Status() != "waiting" {
+		t.Errorf("status = %s, want waiting after solo rematch", rm.Status())
 	}
 }
 
@@ -588,10 +594,10 @@ func TestRematchVotesAfterPlayerLeave(t *testing.T) {
 		t.Errorf("expected 0 votes after leaving player's vote cleared, got %v", votes)
 	}
 
-	// p2 votes — alone, should not trigger rematch
+	// p2 votes — alone, should trigger rematch (solo mode allows 1-player rematch)
 	allVoted := rm.Rematch("p2")
-	if allVoted {
-		t.Error("rematch should not start with only 1 player remaining")
+	if !allVoted {
+		t.Error("solo rematch should start with single remaining player")
 	}
 }
 
@@ -686,6 +692,64 @@ func TestSyncPayloadFinished(t *testing.T) {
 	}
 	if len(payload.Rankings) != 2 {
 		t.Errorf("rankings len = %d, want 2", len(payload.Rankings))
+	}
+}
+
+func TestSoloGameFullRound(t *testing.T) {
+	rm := New("TEST01", "")
+	p1 := newMockPlayer("p1", "Alice")
+	rm.AddPlayer(p1)
+
+	if !rm.CanStart("p1") {
+		t.Fatal("solo player should be able to start")
+	}
+
+	order := rm.StartGame()
+	if len(order) != 1 || order[0] != "p1" {
+		t.Fatalf("order = %v, want [p1]", order)
+	}
+	if rm.Status() != "playing" {
+		t.Fatalf("status = %s, want playing", rm.Status())
+	}
+
+	// Play all 12 rounds
+	categories := []string{
+		"ones", "twos", "threes", "fours", "fives", "sixes",
+		"choice", "fourOfAKind", "fullHouse",
+		"smallStraight", "largeStraight", "yacht",
+	}
+	for i, cat := range categories {
+		_, err := rm.Roll("p1")
+		if err != nil {
+			t.Fatalf("round %d: Roll: %v", i+1, err)
+		}
+		result, err := rm.Score("p1", cat)
+		if err != nil {
+			t.Fatalf("round %d: Score(%s): %v", i+1, cat, err)
+		}
+		if result.TotalScores == nil {
+			t.Fatalf("round %d: TotalScores should not be nil", i+1)
+		}
+	}
+
+	if !rm.IsFinished() {
+		t.Error("game should be finished after 12 rounds")
+	}
+}
+
+func TestSoloRematch(t *testing.T) {
+	rm := New("TEST01", "")
+	p1 := newMockPlayer("p1", "Alice")
+	rm.AddPlayer(p1)
+	rm.StartGame()
+	rm.EndGame(nil)
+
+	allVoted := rm.Rematch("p1")
+	if !allVoted {
+		t.Error("solo rematch should complete with single vote")
+	}
+	if rm.Status() != "waiting" {
+		t.Errorf("status = %s, want waiting after solo rematch", rm.Status())
 	}
 }
 

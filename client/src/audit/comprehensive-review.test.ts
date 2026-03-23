@@ -316,13 +316,13 @@ describe('Critical: App.tsx connection status must use i18n', () => {
 
 // ─── Bug regression: Rematch must require 2+ players ─────────────────────────
 
-describe('Critical: Server Rematch must require at least 2 players', () => {
-  it('room.go Rematch() should guard against solo rematch', () => {
+describe('Critical: Server Rematch must require at least 1 player', () => {
+  it('room.go Rematch() should allow solo rematch', () => {
     const content = readFile('../server/room/room.go');
 
     expect(
-      content.includes('len(r.players) >= 2'),
-      'room.go Rematch() must check len(r.players) >= 2 to prevent solo rematch'
+      content.includes('len(r.players) >= 1'),
+      'room.go Rematch() must check len(r.players) >= 1 to allow solo rematch'
     ).toBe(true);
   });
 });
