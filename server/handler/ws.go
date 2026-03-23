@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -160,7 +161,12 @@ func cleanupIPLimiters() {
 	}
 }
 
+var rateLimitDisabled = os.Getenv("DISABLE_RATE_LIMIT") == "true"
+
 func allowIP(ip string) bool {
+	if rateLimitDisabled {
+		return true
+	}
 	ipLimiterMu.Lock()
 	defer ipLimiterMu.Unlock()
 	entry, ok := ipLimiters[ip]

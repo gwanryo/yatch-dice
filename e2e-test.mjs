@@ -330,6 +330,130 @@ async function testRematchFlow() {
   await sleep(300);
 }
 
+async function testRematchStateReset() {
+  console.log('\n=== TEST 5b: Rematch State Reset (scores cleared on new game) ===');
+
+  const p1 = await connectPlayer('ResetA');
+  const p2 = await connectPlayer('ResetB');
+
+  // Setup room
+  p1.send('room:create', {});
+  const created = await p1.waitFor('room:created');
+  await p1.waitFor('room:state');
+  const roomCode = created.payload.roomCode;
+
+  p2.send('room:join', { roomCode });
+  await p2.waitFor('room:joined');
+  await sleep(200);
+  p1.drain('room:state');
+  p2.drain('room:state');
+
+  p2.send('room:ready');
+  await sleep(200);
+  p1.drain('room:state');
+  p2.drain('room:state');
+
+  // Start first game
+  p1.send('room:start');
+  await p1.waitFor('game:start');
+  await p2.waitFor('game:start');
+  let turn = await p1.waitFor('game:turn');
+  await p2.waitFor('game:turn');
+
+  let firstPlayer = turn.payload.currentPlayer;
+  const players = { [p1.id]: p1, [p2.id]: p2 };
+  let playerOrder = firstPlayer === p1.id ? [p1.id, p2.id] : [p2.id, p1.id];
+
+  // Play all 12 rounds
+  let lastScoredPayload = null;
+  for (let round = 1; round <= 12; round++) {
+    for (let ti = 0; ti < 2; ti++) {
+      const cp = players[playerOrder[ti]];
+      const op = players[playerOrder[1 - ti]];
+
+      cp.send('game:roll');
+      await cp.waitFor('game:rolled');
+      await op.waitFor('game:rolled');
+
+      cp.send('game:score', { category: CATEGORIES[round - 1] });
+      const scored = await cp.waitFor('game:scored');
+      await op.waitFor('game:scored');
+      lastScoredPayload = scored.payload;
+
+      if (round === 12 && ti === 1) {
+        await cp.waitFor('game:end');
+        await op.waitFor('game:end');
+      } else {
+        await cp.waitFor('game:turn');
+        await op.waitFor('game:turn');
+      }
+    }
+  }
+
+  // Verify game 1 had scores
+  const game1Scores = lastScoredPayload.totalScores;
+  const p1Score = Object.values(game1Scores[p1.id] || {});
+  assert(p1Score.length === 12, 'Game 1: P1 has 12 scored categories');
+
+  // Both vote rematch
+  p1.send('game:rematch');
+  await p1.waitFor('rematch:status');
+  p2.send('game:rematch');
+
+  // Wait for rematch:start (room resets)
+  await p1.waitFor('rematch:start');
+  await sleep(200);
+  p1.drain('room:state');
+  p2.drain('room:state');
+
+  // Ready up and start second game
+  p2.send('room:ready');
+  await sleep(200);
+  p1.drain('room:state');
+  p2.drain('room:state');
+
+  p1.send('room:start');
+  await p1.waitFor('game:start');
+  await p2.waitFor('game:start');
+  turn = await p1.waitFor('game:turn');
+  await p2.waitFor('game:turn');
+
+  // Verify new game state is clean
+  assert(turn.payload.round === 1, 'Game 2: starts at round 1');
+
+  firstPlayer = turn.payload.currentPlayer;
+  playerOrder = firstPlayer === p1.id ? [p1.id, p2.id] : [p2.id, p1.id];
+  const cp = players[playerOrder[0]];
+  const op = players[playerOrder[1]];
+
+  // Roll once in the new game
+  cp.send('game:roll');
+  const rolled = await cp.waitFor('game:rolled');
+  await op.waitFor('game:rolled');
+
+  assert(rolled.payload.rollCount === 1, 'Game 2: first roll is rollCount=1');
+  assert(Array.isArray(rolled.payload.dice) && rolled.payload.dice.length === 5, 'Game 2: got 5 dice');
+
+  // Score in the new game — verify totalScores is fresh (only 1 entry)
+  cp.send('game:score', { category: 'ones' });
+  const scored2 = await cp.waitFor('game:scored');
+  await op.waitFor('game:scored');
+
+  const game2Scores = scored2.payload.totalScores;
+  const cpId = playerOrder[0];
+  const opId = playerOrder[1];
+  const cpCategories = Object.keys(game2Scores[cpId] || {});
+  const opCategories = Object.keys(game2Scores[opId] || {});
+
+  assert(cpCategories.length === 1, `Game 2: current player has only 1 scored category (got ${cpCategories.length})`);
+  assert(cpCategories[0] === 'ones', 'Game 2: scored category is ones');
+  assert(opCategories.length === 0, `Game 2: other player has 0 scored categories (got ${opCategories.length})`);
+
+  p1.close();
+  p2.close();
+  await sleep(300);
+}
+
 async function testPlayerRemovalRanking() {
   console.log('\n=== TEST 6: Removed Player Not In Rankings (CR-04) ===');
 
@@ -867,7 +991,7 @@ async function testInvalidCategoryValidation() {
   // Try scoring with an invalid category
   cp.send('game:score', { category: 'notARealCategory' });
   const err = await cp.waitFor('error');
-  assert(err.payload.code === 'INVALID_PAYLOAD', 'Invalid category rejected with INVALID_PAYLOAD');
+  assert(err.payload.code === 'INVALID_CATEGORY', 'Invalid category rejected with INVALID_CATEGORY');
 
   p1.close();
   p2.close();
@@ -1041,6 +1165,7 @@ async function main() {
     testNicknameValidation,
     testAlreadyInRoom,
     testRematchFlow,
+    testRematchStateReset,
     testPlayerRemovalRanking,
     testRollAndScoreValidation,
     testPasswordRoom,

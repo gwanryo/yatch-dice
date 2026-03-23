@@ -118,7 +118,7 @@ func (e *Engine) Score(playerID string, category string) (int, error) {
 	}
 	score := Calculate(e.dice, category)
 	if score == -1 {
-		return 0, errors.New("invalid category")
+		return 0, errors.New(message.ErrInvalidCategory)
 	}
 	e.scores[playerID][category] = score
 	e.advanceTurn()

@@ -33,6 +33,16 @@ vi.mock('../components/ErrorBoundary', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+// Capture ScoreBoard preview prop
+let capturedPreview: Record<string, number> = {};
+vi.mock('../components/ScoreBoard', () => ({
+  __esModule: true,
+  default: (props: { preview: Record<string, number> }) => {
+    capturedPreview = props.preview;
+    return <div data-testid="scoreboard" />;
+  },
+}));
+
 // HandAnnouncement — simplified mock so we can detect when it appears
 vi.mock('../components/HandAnnouncement', () => ({
   __esModule: true,
@@ -195,5 +205,60 @@ describe('GamePage hand announcement timing', () => {
     act(() => capturedOnResult!());
     await act(async () => { await Promise.resolve(); });
     expect(screen.getByTestId('hand-announcement').textContent).toContain('yacht');
+  });
+});
+
+describe('GamePage preview timing', () => {
+  beforeEach(() => {
+    capturedOnResult = null;
+    capturedPreview = {};
+  });
+
+  it('should NOT pass preview to ScoreBoard during shaking/rolling', () => {
+    const preview = { ones: 1, twos: 4, choice: 15 };
+
+    // Render with rollCount=0 (idle), then update to rollCount=1 (shaking)
+    const { rerender } = render(
+      <GamePage
+        state={{ ...baseState, dice: [], rollCount: 0, preview: {} }}
+        dispatch={vi.fn()} send={vi.fn()} playerId="me"
+      />,
+    );
+
+    // Simulate GAME_ROLLED with new rollCount and preview
+    rerender(
+      <GamePage
+        state={{ ...baseState, dice: [1, 2, 3, 4, 5], rollCount: 1, preview }}
+        dispatch={vi.fn()} send={vi.fn()} playerId="me"
+      />,
+    );
+
+    // After effects settle, rollPhase should be 'shaking' and preview NOT passed
+    expect(capturedPreview).toEqual({});
+  });
+
+  it('should pass preview to ScoreBoard after dice settle', async () => {
+    const preview = { ones: 1, twos: 4, choice: 15 };
+
+    const { rerender } = render(
+      <GamePage
+        state={{ ...baseState, dice: [], rollCount: 0, preview: {} }}
+        dispatch={vi.fn()} send={vi.fn()} playerId="me"
+      />,
+    );
+
+    rerender(
+      <GamePage
+        state={{ ...baseState, dice: [1, 2, 3, 4, 5], rollCount: 1, preview }}
+        dispatch={vi.fn()} send={vi.fn()} playerId="me"
+      />,
+    );
+
+    // Trigger dice settle
+    expect(capturedOnResult).not.toBeNull();
+    act(() => capturedOnResult!());
+
+    // After settle, preview should be passed
+    expect(capturedPreview).toEqual(preview);
   });
 });

@@ -73,8 +73,9 @@ const (
 	ErrWrongPassword  = "WRONG_PASSWORD"
 	ErrRoomNotFound   = "ROOM_NOT_FOUND"
 	ErrGameInProgress = "GAME_IN_PROGRESS"
-	ErrInvalidPayload = "INVALID_PAYLOAD"
-	ErrInvalidIndex   = "INVALID_INDEX"
+	ErrInvalidPayload  = "INVALID_PAYLOAD"
+	ErrInvalidIndex    = "INVALID_INDEX"
+	ErrInvalidCategory = "INVALID_CATEGORY"
 )
 
 // Payloads: Lobby

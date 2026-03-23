@@ -81,7 +81,13 @@ function reducer(state: GameState, action: GameAction): GameState {
     case 'SET_PLAYERS':
       return { ...state, players: action.players };
     case 'SET_ROOM_STATE':
-      return { ...state, roomCode: action.roomCode, phase: 'room', players: action.players };
+      return {
+        ...initialState,
+        nickname: state.nickname,
+        roomCode: action.roomCode,
+        phase: 'room',
+        players: action.players,
+      };
     case 'GAME_ROLLED':
       return { ...state, dice: action.dice, rollCount: action.rollCount, held: action.held ?? EMPTY_HELD, preview: action.preview ?? {} };
     case 'GAME_HELD':

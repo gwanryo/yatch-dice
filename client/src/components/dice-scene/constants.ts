@@ -10,9 +10,9 @@ export const TABLE_SIZE = 20;
 export const TABLE_HALF = TABLE_SIZE / 2;
 export const RAIL_R = 0.3;
 export const FADE_SPEED = 0.08;
-export const COL_FLY = 700;
-export const COL_STAGGER = 150;
-export const LIFT_DUR = 600;
+export const COL_FLY = 450;
+export const COL_STAGGER = 80;
+export const LIFT_DUR = 350;
 export const SLIDE_DUR = 450;
 export const POUR_DUR = 800;
 export const SETTLE_THRESH = 0.08;
@@ -21,6 +21,17 @@ export const CAM_DUR = 1000;
 export const WALL_SEGS = 32;
 export const WALL_RINGS = 6;
 export const WALL_DEPTH = 0.35;
+
+// Shake motion parameters — tuned for exciting, snappy feel
+export const SHAKE_SWIRL_SPEED = 0.014;
+export const SHAKE_CIRCLE_R = 0.65;
+export const SHAKE_CIRCLE_R_VAR = 0.18;
+export const SHAKE_TILT_BASE = 0.30;
+export const SHAKE_TILT_VAR = 0.06;
+export const SHAKE_BOUNCE_AMP = 0.15;
+export const SHAKE_NUDGE_INTERVAL = 400;
+export const SHAKE_NUDGE_FORCE = 0.22;
+export const SHAKE_NUDGE_LIFT = 0.14;
 
 export const S = {
   IDLE: 'IDLE',

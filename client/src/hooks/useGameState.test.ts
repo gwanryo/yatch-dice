@@ -251,6 +251,71 @@ describe('useGameState', () => {
     });
   });
 
+  describe('rematch resets game state', () => {
+    it('SET_ROOM_STATE after a finished game clears scores, dice, and game fields', () => {
+      const { result } = renderHook(() => useGameState());
+      // Simulate a completed game with scores, dice, rankings, etc.
+      act(() => {
+        result.current[1]({ type: 'SET_NICKNAME', nickname: 'Alice' });
+        result.current[1]({
+          type: 'GAME_ROLLED',
+          dice: [1, 2, 3, 4, 5],
+          held: [true, false, false, false, false],
+          rollCount: 1,
+          preview: { ones: 1 },
+        });
+        result.current[1]({
+          type: 'GAME_SCORED',
+          playerId: 'p1',
+          category: 'ones',
+          score: 3,
+          scores: { p1: { ones: 3 }, p2: { ones: 4 } },
+        });
+        result.current[1]({
+          type: 'GAME_END',
+          rankings: [
+            { playerId: 'p1', nickname: 'Alice', score: 200, rank: 1 },
+            { playerId: 'p2', nickname: 'Bob', score: 150, rank: 2 },
+          ],
+        });
+        result.current[1]({ type: 'SET_REMATCH_VOTES', votes: ['p1', 'p2'] });
+      });
+
+      // Verify game state is populated
+      expect(result.current[0].scores).toEqual({ p1: { ones: 3 }, p2: { ones: 4 } });
+      expect(result.current[0].rankings).toHaveLength(2);
+      expect(result.current[0].phase).toBe('result');
+
+      // Now simulate rematch:start → SET_ROOM_STATE
+      act(() => {
+        result.current[1]({
+          type: 'SET_ROOM_STATE',
+          roomCode: 'ABC123',
+          players: [
+            { id: 'p1', nickname: 'Alice', isHost: true, isReady: false },
+            { id: 'p2', nickname: 'Bob', isHost: false, isReady: false },
+          ],
+        });
+      });
+
+      // Game-related state should be fully reset
+      expect(result.current[0].phase).toBe('room');
+      expect(result.current[0].scores).toEqual({});
+      expect(result.current[0].dice).toEqual([]);
+      expect(result.current[0].held).toEqual([false, false, false, false, false]);
+      expect(result.current[0].rollCount).toBe(0);
+      expect(result.current[0].round).toBe(1);
+      expect(result.current[0].rankings).toEqual([]);
+      expect(result.current[0].preview).toEqual({});
+      expect(result.current[0].rematchVotes).toEqual([]);
+      expect(result.current[0].currentPlayer).toBeNull();
+      expect(result.current[0].pourCount).toBe(0);
+      expect(result.current[0].lastScored).toBeNull();
+      // nickname should be preserved
+      expect(result.current[0].nickname).toBe('Alice');
+    });
+  });
+
   describe('reconnection sync actions', () => {
     it('ROOM_SYNC restores room phase', () => {
       const { result } = renderHook(() => useGameState());

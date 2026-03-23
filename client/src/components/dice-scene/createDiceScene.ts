@@ -6,6 +6,9 @@ import {
   FADE_SPEED, COL_FLY, COL_STAGGER, LIFT_DUR,
   SLIDE_DUR, POUR_DUR, SETTLE_THRESH, PRESENT_DUR,
   DICE_INIT_POS, PRESENT_ROW, S,
+  SHAKE_SWIRL_SPEED, SHAKE_CIRCLE_R, SHAKE_CIRCLE_R_VAR,
+  SHAKE_TILT_BASE, SHAKE_TILT_VAR, SHAKE_BOUNCE_AMP,
+  SHAKE_NUDGE_INTERVAL, SHAKE_NUDGE_FORCE, SHAKE_NUDGE_LIFT,
   type State,
 } from './constants';
 import { createTable } from './table';
@@ -167,7 +170,7 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
       const elapsed = now - colStart;
       const unheldBodies = diceBodies.filter((_, i) => !heldDice[i]);
       const allSlow = unheldBodies.every(b => b.velocity.length() < 0.3 && b.angularVelocity.length() < 0.3);
-      if ((elapsed > 800 && allSlow) || elapsed > 2500) startShake();
+      if ((elapsed > 400 && allSlow) || elapsed > 1500) startShake();
     }
   }
 
@@ -228,36 +231,40 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
         diceBodies.forEach((b, i) => {
           if (heldDice[i]) return;
           b.type = CANNON.Body.DYNAMIC;
-          b.velocity.set(0, 0, 0);
-          b.angularVelocity.set((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3);
+          b.velocity.set((Math.random() - 0.5) * 2, 0.5, (Math.random() - 0.5) * 2);
+          b.angularVelocity.set((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6);
         });
       }
       return;
     }
 
-    // SHAKE phase
+    // SHAKE phase — fast, exciting circular swirl with bounce
     const se = performance.now() - shakeStart;
-    const swirl = se * 0.008;
-    const circR = 0.5 + Math.sin(se * 0.003) * 0.12;
+    const swirl = se * SHAKE_SWIRL_SPEED;
+    const circR = SHAKE_CIRCLE_R + Math.sin(se * 0.005) * SHAKE_CIRCLE_R_VAR;
 
-    const px = Math.sin(swirl) * circR + Math.sin(swirl * 2.3 + 1) * 0.08;
-    const pz = Math.cos(swirl) * circR + Math.cos(swirl * 1.7 + 2) * 0.08;
+    const px = Math.sin(swirl) * circR + Math.sin(swirl * 2.3 + 1) * 0.12;
+    const pz = Math.cos(swirl) * circR + Math.cos(swirl * 1.7 + 2) * 0.12;
 
-    const tiltAmt = 0.22 + Math.sin(se * 0.005) * 0.04;
+    const tiltAmt = SHAKE_TILT_BASE + Math.sin(se * 0.007) * SHAKE_TILT_VAR;
     const rx = -Math.sin(swirl) * tiltAmt;
     const rz = Math.cos(swirl) * tiltAmt;
-    const ry = Math.sin(se * 0.004) * 0.08;
+    const ry = Math.sin(se * 0.006) * 0.12;
 
-    const bounceY = Math.abs(Math.sin(swirl * 2)) * 0.08;
+    const bounceY = Math.abs(Math.sin(swirl * 2.5)) * SHAKE_BOUNCE_AMP;
 
     cupBody.position.set(cupRestPos.x + px, LIFT_HEIGHT + bounceY, cupRestPos.z + pz);
     cupBody.quaternion.setFromEuler(rx, ry, rz);
 
-    if (se % 800 < 17) {
+    if (se % SHAKE_NUDGE_INTERVAL < 17) {
       diceBodies.forEach((b, i) => {
         if (heldDice[i]) return;
-        if (b.velocity.length() < 2) {
-          _nudgeForce.set((Math.random() - 0.5) * 0.12, 0.08, (Math.random() - 0.5) * 0.12);
+        if (b.velocity.length() < 3) {
+          _nudgeForce.set(
+            (Math.random() - 0.5) * SHAKE_NUDGE_FORCE,
+            SHAKE_NUDGE_LIFT,
+            (Math.random() - 0.5) * SHAKE_NUDGE_FORCE,
+          );
           b.applyImpulse(_nudgeForce, _nudgePoint);
         }
       });
@@ -266,9 +273,9 @@ export function createDiceScene(canvas: HTMLCanvasElement) {
     diceBodies.forEach((b, i) => {
       if (heldDice[i]) return;
       const v = b.velocity.length();
-      if (v > 5) b.velocity.scale(5 / v, b.velocity);
+      if (v > 6) b.velocity.scale(6 / v, b.velocity);
       const av = b.angularVelocity.length();
-      if (av > 10) b.angularVelocity.scale(10 / av, b.angularVelocity);
+      if (av > 12) b.angularVelocity.scale(12 / av, b.angularVelocity);
     });
 
     constrainDiceToCup();

@@ -201,7 +201,7 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
               currentPlayer={state.currentPlayer}
               myId={playerId}
               rollCount={state.rollCount}
-              preview={state.preview}
+              preview={rollPhase === 'settled' ? state.preview : {}}
               hoveredCategory={state.hoveredCategory}
               minimized={rollPhase === 'shaking' || rollPhase === 'rolling'}
               onSelectCategory={isMyTurn && state.rollCount > 0 ? handleScore : undefined}
