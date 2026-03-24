@@ -14,6 +14,11 @@ vi.mock('../utils/highScore', () => ({
   getHighScore: () => null,
 }));
 
+const fullScores: Record<string, Record<string, number>> = {
+  me: { ones: 3, twos: 6, threes: 9, fours: 12, fives: 15, sixes: 18, choice: 22, fourOfAKind: 24, fullHouse: 25, smallStraight: 30, largeStraight: 40, yacht: 50 },
+  other: { ones: 2, twos: 4, threes: 6, fours: 8, fives: 10, sixes: 12, choice: 18, fourOfAKind: 0, fullHouse: 25, smallStraight: 30, largeStraight: 0, yacht: 0 },
+};
+
 const baseState = {
   phase: 'result' as const,
   nickname: 'Me',
@@ -27,10 +32,10 @@ const baseState = {
   rollCount: 0,
   currentPlayer: null,
   round: 12,
-  scores: {},
+  scores: fullScores,
   rankings: [
-    { playerId: 'me', nickname: 'Me', score: 200, rank: 1 },
-    { playerId: 'other', nickname: 'Other', score: 150, rank: 2 },
+    { playerId: 'me', nickname: 'Me', score: 289, rank: 1 },
+    { playerId: 'other', nickname: 'Other', score: 115, rank: 2 },
   ],
   reactions: [],
   preview: {},
@@ -151,11 +156,68 @@ describe('back to lobby', () => {
   });
 });
 
+describe('ResultPage full scorecard', () => {
+  it('renders a scorecard table with all categories', () => {
+    render(<ResultPage state={baseState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />);
+    const table = screen.getByRole('table');
+    expect(table).toBeTruthy();
+    // Should have category rows
+    expect(screen.getByText('categories.ones')).toBeTruthy();
+    expect(screen.getByText('categories.yacht')).toBeTruthy();
+    expect(screen.getByText('categories.choice')).toBeTruthy();
+  });
+
+  it('shows each player score per category', () => {
+    render(<ResultPage state={baseState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />);
+    const onesLabel = screen.getByText('categories.ones');
+    const onesRow = onesLabel.closest('tr')!;
+    const cells = onesRow.querySelectorAll('td');
+    // First cell = category label, subsequent cells = player scores
+    expect(cells[1].textContent).toBe('3');  // me: ones=3
+    expect(cells[2].textContent).toBe('2');  // other: ones=2
+  });
+
+  it('shows upper bonus row', () => {
+    render(<ResultPage state={baseState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />);
+    expect(screen.getByText('categories.upperBonus')).toBeTruthy();
+  });
+
+  it('shows total row with final scores', () => {
+    render(<ResultPage state={baseState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />);
+    const totalLabel = screen.getByText('categories.total');
+    const totalRow = totalLabel.closest('tr')!;
+    expect(totalRow).toBeTruthy();
+  });
+
+  it('highlights winner column', () => {
+    render(<ResultPage state={baseState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />);
+    // The winner (rank 1) header should have a highlight style
+    const table = screen.getByRole('table');
+    const headers = table.querySelectorAll('th');
+    // Find the winner header — should contain 'Me' and have gold styling
+    const winnerHeader = Array.from(headers).find(h => h.textContent?.includes('Me'));
+    expect(winnerHeader).toBeTruthy();
+    expect(winnerHeader!.className).toContain('text-amber');
+  });
+
+  it('renders scorecard in solo mode too', () => {
+    const soloState = {
+      ...baseState,
+      players: [{ id: 'me', nickname: 'Me', isHost: true, isReady: false }],
+      rankings: [{ playerId: 'me', nickname: 'Me', score: 289, rank: 1 }],
+    };
+    render(<ResultPage state={soloState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />);
+    const table = screen.getByRole('table');
+    expect(table).toBeTruthy();
+    expect(screen.getByText('categories.ones')).toBeTruthy();
+  });
+});
+
 describe('solo mode result', () => {
   const soloState = {
     ...baseState,
     players: [{ id: 'me', nickname: 'Me', isHost: true, isReady: false }],
-    rankings: [{ playerId: 'me', nickname: 'Me', score: 200, rank: 1 }],
+    rankings: [{ playerId: 'me', nickname: 'Me', score: 289, rank: 1 }],
   };
 
   it('shows play again button for solo player', () => {
@@ -178,6 +240,7 @@ describe('solo mode result', () => {
   it('shows solo score display instead of rankings', () => {
     render(<ResultPage state={soloState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />);
     expect(screen.getByText('result.soloScore')).toBeTruthy();
-    expect(screen.getByText('200')).toBeTruthy();
+    // 289 appears in both the solo banner and the scorecard total row
+    expect(screen.getAllByText('289').length).toBeGreaterThanOrEqual(1);
   });
 });

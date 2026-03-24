@@ -6,6 +6,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { saveHighScore } from '../utils/highScore';
 import { leaveRoom } from '../utils/leaveRoom';
 import { CELEBRATION_COLORS } from '../utils/constants';
+import { UPPER_CATEGORIES, LOWER_CATEGORIES } from '../types/game';
 import type { GameState, GameAction } from '../hooks/useGameState';
 
 const CONFETTI_DATA = Array.from({ length: 60 }, (_, i) => ({
@@ -33,6 +34,15 @@ function ConfettiParticles() {
       ))}
     </div>
   );
+}
+
+function upperSum(ps: Record<string, number>): number {
+  return UPPER_CATEGORIES.reduce((s, c) => s + (ps[c] ?? 0), 0);
+}
+
+function totalScore(ps: Record<string, number>): number {
+  const sum = Object.values(ps).reduce((a, b) => a + b, 0);
+  return sum + (upperSum(ps) >= 63 ? 35 : 0);
 }
 
 interface Props {
@@ -104,65 +114,133 @@ export default function ResultPage({ state, dispatch, send, playerId }: Props) {
 
       <div className="sr-only" aria-live="polite" role="status">{announced}</div>
 
-      <div className="w-full max-w-md space-y-6 relative z-10">
-        <h1 className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-300 text-center drop-shadow-lg" style={{ fontFamily: '"Outfit", system-ui, sans-serif' }}>
+      <div className="w-full max-w-lg space-y-3 relative z-10">
+        <h1 className="text-3xl font-display text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-300 text-center drop-shadow-lg">
           {t('result.title')}
         </h1>
 
-        {isSolo ? (
-          /* Solo result view */
-          <div className="space-y-4">
-            <div className={`text-center p-6 rounded-xl border transition-[opacity,transform] duration-500 ${
-              revealed > 0 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
-            } bg-gradient-to-r from-amber-500/20 to-yellow-500/10 border-amber-500/50 ring-1 ring-amber-400/20`}>
-              <p className="text-gray-400 text-sm mb-1">{t('result.soloScore')}</p>
-              <p className="text-5xl font-bold text-amber-300 tabular-nums">{soloScore}</p>
-              {highScoreResult?.isNewBest ? (
-                <p className="mt-3 text-lg font-bold text-yellow-300 animate-pulse">
-                  {t('result.newPersonalBest')}
-                </p>
-              ) : highScoreResult?.previous ? (
-                <p className="mt-3 text-sm text-gray-400">
-                  {t('result.personalBest')}: <span className="text-white font-bold">{highScoreResult.previous.score}</span>
-                </p>
-              ) : null}
+        {/* Solo score banner — compact, aligned columns */}
+        {isSolo && (
+          <div className={`flex items-baseline justify-center gap-6 px-4 py-2.5 rounded-xl border transition-[opacity,transform] duration-500 ${
+            revealed > 0 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+          } bg-gradient-to-r from-amber-500/20 to-yellow-500/10 border-amber-500/50 ring-1 ring-amber-400/20`}>
+            <div className="flex items-baseline gap-2">
+              <span className="text-gray-400 text-sm">{t('result.soloScore')}</span>
+              <span className="text-2xl font-bold text-amber-300 tabular-nums">{soloScore}</span>
             </div>
+            {highScoreResult?.isNewBest ? (
+              <div className="flex items-baseline gap-2">
+                <span className="text-sm font-bold text-yellow-300 animate-pulse">
+                  {t('result.newPersonalBest')}
+                </span>
+              </div>
+            ) : highScoreResult?.previous ? (
+              <div className="flex items-baseline gap-2">
+                <span className="text-gray-400 text-sm">{t('result.personalBest')}</span>
+                <span className="text-2xl font-bold text-white/60 tabular-nums">{highScoreResult.previous.score}</span>
+              </div>
+            ) : null}
           </div>
-        ) : (
-          /* Multiplayer ranking view */
-          <div className="space-y-3">
+        )}
+
+        {/* Multiplayer compact ranking bar */}
+        {!isSolo && (
+          <div className="flex flex-wrap gap-2 justify-center">
             {state.rankings.map((r, i) => (
               <div
                 key={r.playerId}
-                className={`flex items-center justify-between p-4 rounded-xl border transition-[opacity,transform] duration-500 ${
-                  i < revealed
-                    ? 'opacity-100 translate-y-0'
-                    : 'opacity-0 translate-y-4'
+                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-[opacity,transform] duration-500 ${
+                  i < revealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
                 } ${
                   i === 0
-                    ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/10 border-amber-500/50 animate-winner-glow scale-[1.02] ring-1 ring-amber-400/20'
-                    : i === 1
-                      ? 'bg-gradient-to-r from-gray-400/10 to-gray-300/5 border-gray-400/20'
-                      : i === 2
-                        ? 'bg-gradient-to-r from-orange-700/10 to-orange-600/5 border-orange-700/20'
-                        : 'bg-black/30 border-white/5'
+                    ? 'bg-gradient-to-r from-amber-500/20 to-yellow-500/10 border-amber-500/50 ring-1 ring-amber-400/20'
+                    : 'bg-black/30 border-white/10'
                 }`}
                 style={{ transitionDelay: `${i * 400}ms` }}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className={`shrink-0 ${i === 0 ? 'text-3xl' : 'text-2xl'}`}>{medals[i] ?? ''}</span>
-                  <div className="min-w-0">
-                    <p className={`font-bold truncate ${i === 0 ? 'text-amber-200 text-lg' : 'text-white'}`}>{r.nickname}</p>
-                    <p className="text-gray-400 text-sm">{t('result.rankLabel', { rank: formatRank(r.rank) })}</p>
-                  </div>
-                </div>
-                <span className={`font-bold tabular-nums shrink-0 ${i === 0 ? 'text-3xl text-amber-300' : 'text-2xl text-white'}`}>{r.score}</span>
+                <span className="text-lg">{medals[i] ?? ''}</span>
+                <span className={`text-base font-bold truncate max-w-[6rem] ${i === 0 ? 'text-amber-200' : 'text-white'}`}>{r.nickname}</span>
+                <span className={`font-bold tabular-nums ${i === 0 ? 'text-amber-300' : 'text-white'}`}>{r.score}</span>
               </div>
             ))}
           </div>
         )}
 
-        <div className="flex gap-3">
+        {/* Full scorecard table */}
+        <div className="bg-black/50 backdrop-blur-md rounded-xl p-3 overflow-auto max-h-[65vh] border border-white/5">
+          <table className="w-full border-collapse" aria-label={t('game.score')}>
+            <thead>
+              <tr>
+                <th className="px-2 py-1 text-left text-xs text-gray-500">{t('game.score')}</th>
+                {state.rankings.map((r, i) => (
+                  <th key={r.playerId} className={`px-2 py-1 text-center text-xs min-w-0 max-w-[5rem] ${
+                    i === 0 ? 'text-amber-300 font-bold' : 'text-gray-500'
+                  }`}>
+                    <span className="block truncate">{r.nickname}</span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {UPPER_CATEGORIES.map(cat => (
+                <tr key={cat}>
+                  <td className="px-2 py-1 text-sm text-gray-400">{t(`categories.${cat}`)}</td>
+                  {state.rankings.map((r, i) => {
+                    const v = state.scores[r.playerId]?.[cat];
+                    return (
+                      <td key={r.playerId} className={`px-2 py-1 text-center text-sm tabular-nums ${
+                        v === undefined ? 'text-gray-600' : v === 0 ? (i === 0 ? 'text-white/30' : 'text-gray-600') : (i === 0 ? 'text-white' : 'text-gray-400')
+                      }`}>
+                        {v ?? '-'}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+              <tr className="border-t border-white/10">
+                <td className="px-2 py-1 text-xs text-gray-500">{t('categories.upperBonus')}</td>
+                {state.rankings.map(r => {
+                  const uSum = upperSum(state.scores[r.playerId] ?? {});
+                  return (
+                    <td key={r.playerId} className="px-2 py-1 text-center text-xs text-gray-500 tabular-nums">
+                      {uSum >= 63 ? '+35' : `${uSum}/63`}
+                    </td>
+                  );
+                })}
+              </tr>
+              <tr className="border-t border-white/10">
+                <td colSpan={state.rankings.length + 1} className="h-1" />
+              </tr>
+              {LOWER_CATEGORIES.map(cat => (
+                <tr key={cat}>
+                  <td className="px-2 py-1 text-sm text-gray-400">{t(`categories.${cat}`)}</td>
+                  {state.rankings.map((r, i) => {
+                    const v = state.scores[r.playerId]?.[cat];
+                    return (
+                      <td key={r.playerId} className={`px-2 py-1 text-center text-sm tabular-nums ${
+                        v === undefined ? 'text-gray-600' : v === 0 ? (i === 0 ? 'text-white/30' : 'text-gray-600') : (i === 0 ? 'text-white' : 'text-gray-400')
+                      }`}>
+                        {v ?? '-'}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+              <tr className="border-t border-white/10">
+                <td className="px-2 py-1 text-sm font-bold text-white">{t('categories.total')}</td>
+                {state.rankings.map((r, i) => (
+                  <td key={r.playerId} className={`px-2 py-1 text-center text-sm font-bold tabular-nums ${
+                    i === 0 ? 'text-amber-300' : 'text-white'
+                  }`}>
+                    {totalScore(state.scores[r.playerId] ?? {})}
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex gap-3 pt-1">
           <Button
             onClick={() => { send('game:rematch'); }}
             // canRematch: 플레이어가 0명이면 리매치 불가 — 상대 전원 퇴장 시

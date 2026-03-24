@@ -188,12 +188,12 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
         </header>
 
         {/* Main area */}
-        <div className="flex-1 flex flex-col lg:flex-row">
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
           {/* Spacer for 3D scene */}
           <div className="flex-1" />
 
           {/* ScoreBoard — right sidebar on desktop, top overlay on mobile */}
-          <div className="pointer-events-auto w-full lg:w-80 p-2 lg:p-4 order-first lg:order-last">
+          <div className="pointer-events-auto w-full lg:w-80 max-h-[70vh] lg:max-h-none p-2 lg:p-4 order-first lg:order-last overflow-y-auto">
             <ScoreBoard
               players={state.players}
               scores={state.scores}
@@ -210,7 +210,7 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
         </div>
 
         {/* Bottom area — dice tray + action */}
-        <div className="pointer-events-auto flex flex-col items-center gap-2 pb-[max(1rem,env(safe-area-inset-bottom))] px-2">
+        <div className="shrink-0 pointer-events-auto flex flex-col items-center gap-2 pb-[max(1rem,env(safe-area-inset-bottom))] px-2">
           <ReactionBar
             onSend={handleReaction}
             reactions={state.reactions}

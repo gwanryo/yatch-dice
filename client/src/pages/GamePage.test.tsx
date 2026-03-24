@@ -209,6 +209,36 @@ describe('GamePage hand announcement timing', () => {
   });
 });
 
+describe('GamePage layout — dice tray must not be clipped', () => {
+  it('bottom area has shrink-0 to prevent compression on small screens', () => {
+    const { container } = render(
+      <GamePage state={baseState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />,
+    );
+    const main = container.querySelector('main')!;
+    const bottomArea = main.lastElementChild as HTMLElement;
+    expect(bottomArea.className).toContain('shrink-0');
+  });
+
+  it('main area has min-h-0 to allow flex content to shrink', () => {
+    const { container } = render(
+      <GamePage state={baseState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />,
+    );
+    const main = container.querySelector('main')!;
+    const children = Array.from(main.children);
+    const middleArea = children[1] as HTMLElement;
+    expect(middleArea.className).toContain('min-h-0');
+  });
+
+  it('scoreboard container has max-h-[70vh] on mobile to leave room for tray', () => {
+    const { container } = render(
+      <GamePage state={baseState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />,
+    );
+    const scoreboardWrapper = container.querySelector('[data-testid="scoreboard"]')?.parentElement;
+    expect(scoreboardWrapper).toBeTruthy();
+    expect(scoreboardWrapper!.className).toContain('max-h-[70vh]');
+  });
+});
+
 describe('GamePage preview timing', () => {
   beforeEach(() => {
     capturedOnResult = null;
