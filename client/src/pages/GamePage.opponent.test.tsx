@@ -132,6 +132,65 @@ describe('GamePage opponent status text', () => {
   });
 });
 
+describe('GamePage opponent tray integration', () => {
+  beforeEach(() => { capturedOnResult = null; });
+
+  it('shows tray with empty slots and "—" action when opponent is idle (rollCount=0)', () => {
+    const { container } = render(
+      <GamePage state={baseState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />,
+    );
+    // Tray should render with empty slots (not null)
+    expect(container.querySelector('.dice-tray')).not.toBeNull();
+    // Action label shows "—"
+    expect(screen.getByText('—')).toBeTruthy();
+    // Status text below tray
+    expect(screen.getByText('game.opponentTurn')).toBeTruthy();
+  });
+
+  it('shows tray with dice and "—" action when opponent has rolled', () => {
+    const { rerender, container } = render(
+      <GamePage state={baseState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />,
+    );
+    act(() => {
+      rerender(
+        <GamePage
+          state={{ ...baseState, rollCount: 1, dice: [2, 3, 4, 5, 6] }}
+          dispatch={vi.fn()} send={vi.fn()} playerId="me"
+        />,
+      );
+    });
+    // Tray visible with dice
+    expect(container.querySelector('.dice-tray')).not.toBeNull();
+    // Action is "—" (opponent can't act from our side)
+    expect(screen.getByText('—')).toBeTruthy();
+    // Status text shows shaking phase
+    expect(screen.getByText('game.opponentShaking')).toBeTruthy();
+  });
+
+  it('does NOT show status text when it is my turn', () => {
+    render(
+      <GamePage
+        state={{ ...baseState, currentPlayer: 'me', rollCount: 1, dice: [1, 2, 3, 4, 5] }}
+        dispatch={vi.fn()} send={vi.fn()} playerId="me"
+      />,
+    );
+    // My-turn status texts should not be present
+    expect(screen.queryByText('game.opponentTurn')).toBeNull();
+    expect(screen.queryByText('game.opponentShaking')).toBeNull();
+    expect(screen.queryByText('game.opponentChoosing')).toBeNull();
+    expect(screen.queryByText('game.rolling')).toBeNull();
+    expect(screen.queryByText('game.selectScore')).toBeNull();
+  });
+
+  it('status text has aria-live for accessibility', () => {
+    render(
+      <GamePage state={baseState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />,
+    );
+    const statusEl = screen.getByText('game.opponentTurn');
+    expect(statusEl.getAttribute('aria-live')).toBe('polite');
+  });
+});
+
 describe('GamePage hand announcement', () => {
   beforeEach(() => { capturedOnResult = null; });
 

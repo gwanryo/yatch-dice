@@ -42,7 +42,7 @@ play_turn() {
   [ -n "$ref" ] && "${cmd[@]}" click "$ref" >/dev/null 2>&1||true
   local w=0; while [ $w -lt 15 ]; do sleep 1
     S=$("${cmd[@]}" snapshot -i 2>&1)
-    echo "$S"|grep -qE 'Shake!.*\(|점수를 선택' && break; w=$((w+1)); done
+    echo "$S"|grep -qE 'Shake!.*\(' && break; echo "$S"|grep -qE '"—"' && break; w=$((w+1)); done
   ref=$(_r "$(echo "$S"|grep -E '^\s*- button "(1|2|3|4|5|6|초이스|포커|풀하우스|스몰 스트레이트|라지 스트레이트|요트)"'|head -1)")
   [ -n "$ref" ] && { "${cmd[@]}" click "$ref" >/dev/null 2>&1||true; sleep 3; return 0; }
   return 1
@@ -89,7 +89,8 @@ assert "Change nick" "$S" '"변경"'
 echo ""; echo -e "${YELLOW}Test 2: Room${NC}"
 ab click "$(ref_of "$S" 'button.*방 만들기')">/dev/null; sleep 2; S=$(snap)
 assert "Room page" "$S" '방 코드 복사'
-assert "Start disabled" "$S" 'disabled'
+# Solo play enabled — start button is active even when alone
+assert "Start enabled (solo)" "$S" '게임 시작'
 RC=$(ab get url|grep -oE 'room=[A-Z0-9]+'|cut -d= -f2); echo "  Room: $RC"
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -118,11 +119,17 @@ assert "All 8 emoji buttons visible" "emoji_count_$EMOJI_COUNT" 'emoji_count_8'
 EMOJI_REF=$(ref_of "$S" '보내기')
 [ -n "$EMOJI_REF" ] && ab click "$EMOJI_REF" >/dev/null 2>&1; sleep 1
 
-# ── Test 4b: Opponent status text during game ──
-echo -e "  ${CYAN}Checking opponent status text...${NC}"
-S2=$(snap2)
-# P2 should see opponent-related text (shaking/rolling/turn) since P1 acts first
-assert "P2 sees opponent status" "$S2" '상대|opponent|Opponent'
+# ── Test 4b: Tray-integrated layout & opponent status text ──
+echo -e "  ${CYAN}Checking tray layout and opponent status...${NC}"
+
+# P1 is first player — should see Shake! action in tray
+S=$(snap)
+assert "P1 sees tray with Shake!" "$S" 'Shake!'
+
+# P2 waits — should see the game and not have Shake! (it's P1's turn)
+sleep 3; S2=$(snap2)
+assert "P2 sees game started" "$S2" '라운드.*1/12'
+assert_not "P2 does not see Shake! (not their turn)" "$S2" 'Shake!'
 
 # ── Test 4c: Hand announcement should NOT appear before roll settles ──
 echo -e "  ${CYAN}Checking hand announcement timing...${NC}"

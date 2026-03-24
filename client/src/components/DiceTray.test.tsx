@@ -23,9 +23,11 @@ describe('DiceTray', () => {
     onHold: vi.fn(),
   };
 
-  it('renders nothing when rollCount is 0', () => {
+  it('renders empty dice slots when rollCount is 0', () => {
     const { container } = render(<DiceTray {...defaultProps} rollCount={0} />);
-    expect(container.firstChild).toBeNull();
+    expect(container.firstChild).not.toBeNull();
+    // Empty slots are divs, not interactive buttons
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 
   it('renders dice buttons when rollCount > 0 and dice exist', () => {

@@ -6,7 +6,6 @@ import DiceTray from '../components/DiceTray';
 import ScoreBoard from '../components/ScoreBoard';
 import ReactionBar from '../components/ReactionBar';
 import HandAnnouncement from '../components/HandAnnouncement';
-import Button from '../components/Button';
 import ErrorBoundary from '../components/ErrorBoundary';
 import type { GameState, GameAction } from '../hooks/useGameState';
 import type { Category } from '../types/game';
@@ -210,8 +209,18 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
           </div>
         </div>
 
-        {/* Bottom area — dice tray + buttons */}
-        <div className="pointer-events-auto flex flex-col items-center gap-3 pb-[max(1rem,env(safe-area-inset-bottom))] px-2">
+        {/* Bottom area — dice tray + action */}
+        <div className="pointer-events-auto flex flex-col items-center gap-2 pb-[max(1rem,env(safe-area-inset-bottom))] px-2">
+          <ReactionBar
+            onSend={handleReaction}
+            reactions={state.reactions}
+            onExpire={handleReactionExpire}
+            players={state.players}
+          />
+          <span className="sr-only" role="status" aria-live="polite">
+            {rollPhase === 'shaking' ? t('game.rollDice') : rollPhase === 'rolling' ? t('game.rolling') : ''}
+          </span>
+          {/* Dice tray with integrated action */}
           <DiceTray
             dice={state.dice}
             held={state.held}
@@ -219,43 +228,30 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
             isMyTurn={isMyTurn}
             settled={rollPhase === 'settled' || rollPhase === 'idle'}
             onHold={handleHold}
-          />
-          {/* Button area — always visible */}
-          <div className="flex flex-col items-center gap-2 min-h-[52px]">
-            <span className="sr-only" role="status" aria-live="polite">
-              {rollPhase === 'shaking' ? t('game.rollDice') : rollPhase === 'rolling' ? t('game.rolling') : ''}
-            </span>
-            <div className="flex gap-4">
-              {!isMyTurn ? (
-                <Button variant="ghost" size="lg" disabled>
-                  {rollPhase === 'shaking' ? t('game.opponentShaking') : rollPhase === 'rolling' ? t('game.opponentRolled') : rollPhase === 'settled' ? t('game.opponentChoosing') : t('game.opponentTurn')}
-                </Button>
+            action={
+              !isMyTurn ? (
+                <span className="dice-tray-label ghost">{'—'}</span>
               ) : rollPhase === 'shaking' ? (
-                <Button variant="success" size="lg" onClick={handleRoll}>
+                <button onClick={handleRoll} className="dice-tray-label active focus-visible:ring-2 focus-visible:ring-white rounded">
                   {t('game.rollDice')}
-                </Button>
+                </button>
               ) : rollPhase === 'rolling' ? (
-                <Button variant="ghost" size="lg" disabled>
-                  {t('game.rolling')}
-                </Button>
+                <span className="dice-tray-label ghost">{t('game.rollDice')}</span>
               ) : state.rollCount >= 3 ? (
-                <Button variant="ghost" size="lg" disabled>
-                  {t('game.selectScore')}
-                </Button>
+                <span className="dice-tray-label ghost">{'—'}</span>
               ) : (
-                <Button variant="warning" size="lg" onClick={handleShake}>
-                  {t('game.shake')}
-                  {state.rollCount > 0 && ` (${3 - state.rollCount})`}
-                </Button>
-              )}
-            </div>
-          </div>
-          <ReactionBar
-            onSend={handleReaction}
-            reactions={state.reactions}
-            onExpire={handleReactionExpire}
-            players={state.players}
+                <button onClick={handleShake} className="dice-tray-label active focus-visible:ring-2 focus-visible:ring-white rounded">
+                  {t('game.shake')}{state.rollCount > 0 && <br />}{state.rollCount > 0 && `(${3 - state.rollCount})`}
+                </button>
+              )
+            }
           />
+          {/* Opponent status text */}
+          {!isMyTurn && (
+            <span className="text-xs text-white/40 min-h-[18px]" aria-live="polite">
+              {rollPhase === 'shaking' ? t('game.opponentShaking') : rollPhase === 'rolling' ? t('game.opponentRolled') : rollPhase === 'settled' ? t('game.opponentChoosing') : t('game.opponentTurn')}
+            </span>
+          )}
         </div>
       </main>
     </div>

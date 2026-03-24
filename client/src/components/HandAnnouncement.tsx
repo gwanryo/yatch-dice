@@ -92,7 +92,7 @@ export default function HandAnnouncement({ category, score, onDone }: Props) {
                   : phase === 'enter'
                     ? 'translate(0, 0) scale(0)'
                     : `translate(${Math.cos(p.angle) * p.distance * 1.5}px, ${Math.sin(p.angle) * p.distance * 1.5}px) scale(0)`,
-                transition: `all ${0.4 + p.delay}s cubic-bezier(0.22, 1, 0.36, 1)`,
+                transition: `transform ${0.4 + p.delay}s cubic-bezier(0.22, 1, 0.36, 1), opacity ${0.4 + p.delay}s cubic-bezier(0.22, 1, 0.36, 1)`,
                 transitionDelay: `${p.delay}s`,
               }}
             />

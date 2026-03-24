@@ -76,11 +76,12 @@ const baseState = {
 };
 
 describe('GamePage button area', () => {
-  it('shows "select score" prompt when all rolls used', () => {
+  it('shows disabled tray action when all rolls used', () => {
     render(
       <GamePage state={baseState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />,
     );
-    expect(screen.getByText('game.selectScore')).toBeTruthy();
+    // When rollCount >= 3, tray action shows "—" (no action available)
+    expect(screen.getByText('—')).toBeTruthy();
   });
 
   it('shows "opponent turn" text when not my turn', () => {
