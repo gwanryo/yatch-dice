@@ -35,14 +35,15 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
   const sceneRef = useRef<DiceSceneAPI>(null);
   const diceRef = useRef(state.dice);
   diceRef.current = state.dice;
+  const pendingShakeRef = useRef(false);
 
   // #6: Hand announcement state
   const [announcedHand, setAnnouncedHand] = useState<Category | null>(null);
   const [announcedScore, setAnnouncedScore] = useState<number | undefined>();
 
   const handleShake = () => {
-    if (!isMyTurn || state.rollCount >= 3) return;
-    setRollPhase('shaking');
+    if (!isMyTurn || state.rollCount >= 3 || pendingShakeRef.current) return;
+    pendingShakeRef.current = true;
     send('game:roll');
   };
 
@@ -64,6 +65,7 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
     if (state.currentPlayer !== prevPlayerRef.current) {
       prevPlayerRef.current = state.currentPlayer;
       setRollPhase('idle');
+      pendingShakeRef.current = false;
       prevRollCountRef.current = 0;
       prevPourRef.current = 0;
       setAnnouncedHand(null);
@@ -75,6 +77,7 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
 
     // Roll count incremented → start shake animation
     if (state.rollCount > prevRollCountRef.current && state.dice.length === 5) {
+      pendingShakeRef.current = false;
       api.setValues(state.dice);
       api.shake();
       setRollPhase('shaking');

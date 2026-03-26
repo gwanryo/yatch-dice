@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import GamePage from './GamePage';
 
 vi.mock('react-i18next', () => ({
@@ -8,6 +9,10 @@ vi.mock('react-i18next', () => ({
 
 // Capture onResult so we can trigger settle manually
 let capturedOnResult: (() => void) | null = null;
+
+// Persistent mock fns — accessible across re-renders
+const mockShake = vi.fn();
+const mockRoll = vi.fn().mockReturnValue(true);
 
 // NOTE: This mock replaces the simpler mock that was here before.
 // Must use require('react') inside factory since vi.mock is hoisted above imports.
@@ -19,8 +24,8 @@ vi.mock('../components/DiceScene', () => {
       React.useImperativeHandle(ref, () => ({
         setValues: vi.fn(),
         setHeld: vi.fn(),
-        shake: vi.fn(),
-        roll: vi.fn().mockReturnValue(true),
+        shake: mockShake,
+        roll: mockRoll,
         onResult: (cb: () => void) => { capturedOnResult = cb; },
       }));
       return null;
@@ -236,6 +241,141 @@ describe('GamePage layout — dice tray must not be clipped', () => {
     const scoreboardWrapper = container.querySelector('[data-testid="scoreboard"]')?.parentElement;
     expect(scoreboardWrapper).toBeTruthy();
     expect(scoreboardWrapper!.className).toContain('max-h-[70vh]');
+  });
+});
+
+describe('GamePage roll button race condition', () => {
+  const mockSend = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capturedOnResult = null;
+  });
+
+  it('should NOT show Roll! button immediately after clicking Shake! (before server responds)', async () => {
+    const user = userEvent.setup();
+    const state = { ...baseState, rollCount: 0, dice: [] as number[] };
+
+    render(
+      <GamePage state={state} dispatch={vi.fn()} send={mockSend} playerId="me" />,
+    );
+
+    // Shake! button should be visible
+    const shakeButton = screen.getByRole('button', { name: 'game.shake' });
+    expect(shakeButton).toBeInTheDocument();
+
+    // Click Shake!
+    await user.click(shakeButton);
+
+    // game:roll should be sent to server
+    expect(mockSend).toHaveBeenCalledWith('game:roll');
+
+    // Roll! button should NOT appear — scene hasn't started shaking yet
+    expect(screen.queryByRole('button', { name: 'game.rollDice' })).not.toBeInTheDocument();
+  });
+
+  it('should show Roll! button only after server responds (rollCount increases)', async () => {
+    const user = userEvent.setup();
+    const state = { ...baseState, rollCount: 0, dice: [] as number[] };
+
+    const { rerender } = render(
+      <GamePage state={state} dispatch={vi.fn()} send={mockSend} playerId="me" />,
+    );
+
+    // Click Shake!
+    await user.click(screen.getByRole('button', { name: 'game.shake' }));
+    expect(mockSend).toHaveBeenCalledWith('game:roll');
+
+    // Simulate server response: rollCount 0 → 1
+    const updatedState = { ...baseState, rollCount: 1, dice: [3, 4, 2, 5, 1] };
+    rerender(
+      <GamePage state={updatedState} dispatch={vi.fn()} send={mockSend} playerId="me" />,
+    );
+
+    // NOW Roll! button should appear (useEffect called api.shake())
+    expect(screen.getByRole('button', { name: 'game.rollDice' })).toBeInTheDocument();
+    expect(mockShake).toHaveBeenCalled();
+  });
+
+  it('should prevent duplicate game:roll sends before server responds', async () => {
+    const user = userEvent.setup();
+    const state = { ...baseState, rollCount: 0, dice: [] as number[] };
+
+    render(
+      <GamePage state={state} dispatch={vi.fn()} send={mockSend} playerId="me" />,
+    );
+
+    const shakeButton = screen.getByRole('button', { name: 'game.shake' });
+
+    // Click Shake! twice rapidly
+    await user.click(shakeButton);
+    await user.click(shakeButton);
+
+    // game:roll should only be sent once
+    const rollCalls = mockSend.mock.calls.filter((args) => args[0] === 'game:roll');
+    expect(rollCalls).toHaveLength(1);
+  });
+
+  it('should allow Shake! again after a full roll cycle (settle → shake)', async () => {
+    const user = userEvent.setup();
+    const state = { ...baseState, rollCount: 0, dice: [] as number[] };
+
+    const { rerender } = render(
+      <GamePage state={state} dispatch={vi.fn()} send={mockSend} playerId="me" />,
+    );
+
+    // 1st Shake!
+    await user.click(screen.getByRole('button', { name: 'game.shake' }));
+    expect(mockSend).toHaveBeenCalledWith('game:roll');
+
+    // Server responds
+    rerender(
+      <GamePage state={{ ...baseState, rollCount: 1, dice: [3, 4, 2, 5, 1] }} dispatch={vi.fn()} send={mockSend} playerId="me" />,
+    );
+
+    // Roll!
+    await user.click(screen.getByRole('button', { name: 'game.rollDice' }));
+
+    // Simulate dice settle
+    act(() => capturedOnResult!());
+
+    // Shake! button should reappear (rollCount=1, still <3)
+    const shakeAgain = screen.getByRole('button', { name: /game\.shake/ });
+    expect(shakeAgain).toBeInTheDocument();
+
+    // 2nd Shake! should work
+    mockSend.mockClear();
+    await user.click(shakeAgain);
+    const rollCalls = mockSend.mock.calls.filter((args) => args[0] === 'game:roll');
+    expect(rollCalls).toHaveLength(1);
+  });
+
+  it('should reset pending state on turn change', async () => {
+    const user = userEvent.setup();
+    const state = { ...baseState, rollCount: 0, dice: [] as number[] };
+
+    const { rerender } = render(
+      <GamePage state={state} dispatch={vi.fn()} send={mockSend} playerId="me" />,
+    );
+
+    // Click Shake! (pending = true)
+    await user.click(screen.getByRole('button', { name: 'game.shake' }));
+
+    // Turn changes before server responds
+    rerender(
+      <GamePage state={{ ...baseState, rollCount: 0, dice: [], currentPlayer: 'other' }} dispatch={vi.fn()} send={mockSend} playerId="me" />,
+    );
+
+    // Turn back to me
+    mockSend.mockClear();
+    rerender(
+      <GamePage state={{ ...baseState, rollCount: 0, dice: [], currentPlayer: 'me' }} dispatch={vi.fn()} send={mockSend} playerId="me" />,
+    );
+
+    // Shake! should be available again (pending was reset on turn change)
+    const shakeButton = screen.getByRole('button', { name: 'game.shake' });
+    await user.click(shakeButton);
+    expect(mockSend).toHaveBeenCalledWith('game:roll');
   });
 });
 
