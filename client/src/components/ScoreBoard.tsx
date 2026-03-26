@@ -37,6 +37,8 @@ export default memo(function ScoreBoard({
   preview, hoveredCategory, minimized, onSelectCategory, onHoverCategory,
 }: Props) {
   const { t } = useTranslation();
+  const useShortNames = players.length >= 3;
+  const catLabel = (key: string) => t(`categories.${useShortNames ? `${key}_short` : key}`);
   const isMyTurn = currentPlayer === myId;
   const myScores = myId ? (scores[myId] ?? {}) : {};
 
@@ -101,9 +103,9 @@ export default memo(function ScoreBoard({
         onMouseLeave={() => canSelect && handleRowLeave()}
       >
         {/* #1: entire row is clickable via tr onClick, button kept for a11y */}
-        <td className={`px-2 py-1.5 text-sm font-medium ${
+        <td className={`px-2 py-1.5 text-sm font-medium whitespace-nowrap ${
           canSelect ? 'text-yellow-300 font-semibold' : 'text-gray-400'
-        }`}>
+        }`} title={useShortNames ? t(`categories.${cat}`) : undefined}>
           {canSelect ? (
             <button
               type="button"
@@ -113,10 +115,10 @@ export default memo(function ScoreBoard({
               onBlur={() => handleRowLeave()}
               className="w-full text-left focus-visible:outline-2 focus-visible:outline-yellow-400 focus-visible:outline-offset-[-2px] rounded-sm active:bg-yellow-500/30"
             >
-              {t(`categories.${cat}`)}
+              {catLabel(cat)}
             </button>
           ) : (
-            t(`categories.${cat}`)
+            catLabel(cat)
           )}
         </td>
         {players.map(p => {
@@ -216,7 +218,7 @@ export default memo(function ScoreBoard({
         `}
       >
         <div className="overflow-hidden">
-          <div className="bg-black/50 backdrop-blur-md rounded-xl p-3 overflow-auto max-h-[80vh] border border-white/5 mt-2 lg:mt-0 animate-fade-in">
+          <div className="bg-black/50 backdrop-blur-md rounded-xl p-3 overflow-x-auto border border-white/5 mt-2 lg:mt-0 animate-fade-in">
             <table className="w-full border-collapse" aria-label={t('game.score')}>
               <thead>
                 <tr>
@@ -233,7 +235,7 @@ export default memo(function ScoreBoard({
               <tbody>
                 {UPPER_CATEGORIES.map(renderRow)}
                 <tr className="border-t border-white/10">
-                  <td className="px-2 py-1 text-xs text-gray-500">{t('categories.upperBonus')}</td>
+                  <td className="px-2 py-1 text-xs text-gray-500 whitespace-nowrap" title={useShortNames ? t('categories.upperBonus') : undefined}>{catLabel('upperBonus')}</td>
                   {playerStats.map(ps => (
                     <td key={ps.id} className="px-2 py-1 text-center text-xs text-gray-500 tabular-nums">
                       {ps.bonusDisplay}
@@ -243,7 +245,7 @@ export default memo(function ScoreBoard({
                 <tr aria-hidden="true"><td colSpan={players.length + 1} className="h-2" /></tr>
                 {LOWER_CATEGORIES.map(renderRow)}
                 <tr className="border-t border-white/20">
-                  <td className="px-2 py-1 text-sm font-bold text-white">{t('categories.total')}</td>
+                  <td className="px-2 py-1 text-sm font-bold text-white whitespace-nowrap" title={useShortNames ? t('categories.total') : undefined}>{catLabel('total')}</td>
                   {playerStats.map(ps => (
                     <td key={ps.id} className="px-2 py-1 text-center text-sm font-bold text-white tabular-nums">
                       {ps.total}

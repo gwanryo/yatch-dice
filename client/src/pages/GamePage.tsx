@@ -196,7 +196,7 @@ export default function GamePage({ state, dispatch, send, playerId }: Props) {
           <div className="flex-1" />
 
           {/* ScoreBoard — right sidebar on desktop, top overlay on mobile */}
-          <div className="pointer-events-auto w-full lg:w-80 max-h-[70vh] lg:max-h-none p-2 lg:p-4 order-first lg:order-last overflow-y-auto">
+          <div className="pointer-events-auto w-full lg:w-80 p-2 lg:p-4 order-first lg:order-last">
             <ScoreBoard
               players={state.players}
               scores={state.scores}

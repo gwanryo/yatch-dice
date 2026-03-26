@@ -57,7 +57,10 @@
     "fours": "4", "fives": "5", "sixes": "6",
     "choice": "チョイス", "fourOfAKind": "フォーカード", "fullHouse": "フルハウス",
     "smallStraight": "Sストレート", "largeStraight": "Lストレート", "yacht": "ヨット",
-    "upperBonus": "上段ボーナス", "total": "合計"
+    "upperBonus": "上段ボーナス", "total": "合計",
+    "choice_short": "C", "fourOfAKind_short": "Fk", "fullHouse_short": "F.H",
+    "smallStraight_short": "S.S", "largeStraight_short": "L.S", "yacht_short": "Yt",
+    "upperBonus_short": "Bn", "total_short": "Tot"
   },
   "result": {
     "title": "ゲーム結果",

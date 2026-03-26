@@ -301,6 +301,56 @@ describe('ScoreBoard', () => {
     });
   });
 
+  // #12 No nested scroll containers / 4-player layout
+  describe('#12 nested scroll and 4-player layout', () => {
+    const fourPlayers: PlayerInfo[] = [
+      { id: 'p1', nickname: 'LongNickname1', isHost: true, isReady: false },
+      { id: 'p2', nickname: 'LongNickname2', isHost: false, isReady: false },
+      { id: 'p3', nickname: 'LongNickname3', isHost: false, isReady: false },
+      { id: 'p4', nickname: 'LongNickname4', isHost: false, isReady: false },
+    ];
+
+    const fourPlayerProps = {
+      ...defaultProps,
+      players: fourPlayers,
+      scores: { p1: {}, p2: {}, p3: {}, p4: {} },
+      currentPlayer: 'p1',
+      myId: 'p1',
+    };
+
+    it('should not have nested overflow-auto containers (causes double scrollbar)', () => {
+      const { container } = render(<ScoreBoard {...fourPlayerProps} />);
+      const overflowAutoEls = container.querySelectorAll('[class*="overflow-auto"]');
+      expect(overflowAutoEls.length).toBeLessThanOrEqual(1);
+    });
+
+    it('should not have an element with both overflow-auto and max-h (creates vertical scroll that nests with parent)', () => {
+      const { container } = render(<ScoreBoard {...fourPlayerProps} />);
+      const els = container.querySelectorAll('[class*="overflow-auto"]');
+      const nestedScrollEls = Array.from(els).filter(el =>
+        /max-h-\[/.test(el.className),
+      );
+      expect(nestedScrollEls).toHaveLength(0);
+    });
+
+    it('should render all 4 player columns in the table header', () => {
+      render(<ScoreBoard {...fourPlayerProps} />);
+      const table = screen.getByRole('table', { name: 'game.score' });
+      const headerCells = table.querySelectorAll('thead th');
+      expect(headerCells).toHaveLength(5);
+    });
+
+    it('should truncate long nicknames in column headers', () => {
+      render(<ScoreBoard {...fourPlayerProps} />);
+      const table = screen.getByRole('table', { name: 'game.score' });
+      const headerCells = table.querySelectorAll('thead th');
+      for (let i = 1; i < headerCells.length; i++) {
+        const span = headerCells[i].querySelector('span');
+        expect(span?.className).toContain('truncate');
+      }
+    });
+  });
+
   // Score computation display
   describe('score display', () => {
     it('displays upper bonus progress', () => {

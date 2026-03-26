@@ -15,6 +15,8 @@ AB_FLAGS="${AB_FLAGS:---headed}"
 cleanup() { echo ""; echo "Cleaning up..."
   agent-browser $AB_FLAGS close 2>/dev/null || true
   agent-browser $AB_FLAGS --session p2 close 2>/dev/null || true
+  agent-browser $AB_FLAGS --session p3 close 2>/dev/null || true
+  agent-browser $AB_FLAGS --session p4 close 2>/dev/null || true
   [ -n "$VITE_PID" ] && kill "$VITE_PID" 2>/dev/null || true
   [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null || true
   wait 2>/dev/null || true; }
@@ -199,6 +201,74 @@ else
   assert_not "P1 not in waiting" "$S" '플레이어를 기다리는 중'
   assert_not "P2 not in waiting" "$S2" '플레이어를 기다리는 중'
 fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+echo ""; echo -e "${YELLOW}Test 8: Scoreboard — no double scrollbars with 4 players${NC}"
+# Both players back to lobby after Test 7; create a 4-player room
+S=$(snap); ab fill "$(ref_of "$S" textbox)" "VeryLongNickname1">/dev/null 2>&1||true
+S=$(snap); ab click "$(ref_of "$S" 'button.*방 만들기')">/dev/null; sleep 2
+RC4=$(ab get url|grep -oE 'room=[A-Z0-9]+'|cut -d= -f2); echo "  Room: $RC4"
+
+# P2 joins
+S2=$(snap2); ab2 fill "$(ref_of "$S2" 'textbox.*ABCDEF')" "$RC4">/dev/null; S2=$(snap2)
+ab2 click "$(_r "$(echo "$S2"|grep '"참여"'|grep -v disabled|head -1)")">/dev/null; sleep 2
+S2=$(snap2); ab2 click "$(ref_of "$S2" '"준비"')">/dev/null; sleep 1
+
+# P3 and P4 join via new sessions
+ab3() { agent-browser $AB_FLAGS --session p3 "$@" 2>&1; }; snap3() { ab3 snapshot -i; }
+ab4() { agent-browser $AB_FLAGS --session p4 "$@" 2>&1; }; snap4() { ab4 snapshot -i; }
+
+ab3 open "$BASE">/dev/null; ab3 wait --load networkidle>/dev/null; S3=$(snap3)
+ab3 fill "$(ref_of "$S3" textbox)" "SuperDuperLongName">/dev/null
+ab3 click "$(ref_of "$S3" 'button.*disabled')">/dev/null; sleep 1; S3=$(snap3)
+ab3 fill "$(ref_of "$S3" 'textbox.*ABCDEF')" "$RC4">/dev/null; S3=$(snap3)
+ab3 click "$(_r "$(echo "$S3"|grep '"참여"'|grep -v disabled|head -1)")">/dev/null; sleep 2
+S3=$(snap3); ab3 click "$(ref_of "$S3" '"준비"')">/dev/null; sleep 1
+
+ab4 open "$BASE">/dev/null; ab4 wait --load networkidle>/dev/null; S4=$(snap4)
+ab4 fill "$(ref_of "$S4" textbox)" "AnotherBigName42">/dev/null
+ab4 click "$(ref_of "$S4" 'button.*disabled')">/dev/null; sleep 1; S4=$(snap4)
+ab4 fill "$(ref_of "$S4" 'textbox.*ABCDEF')" "$RC4">/dev/null; S4=$(snap4)
+ab4 click "$(_r "$(echo "$S4"|grep '"참여"'|grep -v disabled|head -1)")">/dev/null; sleep 2
+S4=$(snap4); ab4 click "$(ref_of "$S4" '"준비"')">/dev/null; sleep 1
+
+# Start game
+S=$(snap); ab click "$(ref_of "$S" '"게임 시작"')">/dev/null; sleep 5
+S=$(snap)
+assert "4-player game started" "$S" '라운드 1/12'
+
+# Check for double scrollbar: count scroll containers from table to root
+SCROLL_CHECK=$(ab execute "
+  var table = document.querySelector('table[aria-label]');
+  if (!table) return 'NO_TABLE';
+  var el = table, n = 0;
+  while (el) {
+    var s = window.getComputedStyle(el);
+    if (s.overflowX === 'auto' || s.overflowX === 'scroll' ||
+        s.overflowY === 'auto' || s.overflowY === 'scroll') n++;
+    el = el.parentElement;
+  }
+  return 'SCROLL_CONTAINERS=' + n;
+")
+echo "  $SCROLL_CHECK"
+assert_not "No double scroll containers" "$SCROLL_CHECK" 'SCROLL_CONTAINERS=[2-9]'
+
+# Check table fits within container (no horizontal overflow)
+TABLE_CHECK=$(ab execute "
+  var table = document.querySelector('table[aria-label]');
+  if (!table) return 'NO_TABLE';
+  var headers = table.querySelectorAll('thead th').length;
+  var tR = table.getBoundingClientRect();
+  var cR = table.parentElement.getBoundingClientRect();
+  var overflows = tR.width > cR.width + 1;
+  return 'HEADERS=' + headers + ',OVERFLOWS=' + overflows;
+")
+echo "  $TABLE_CHECK"
+assert "5 table headers (1 label + 4 players)" "$TABLE_CHECK" 'HEADERS=5'
+assert "Table fits within container" "$TABLE_CHECK" 'OVERFLOWS=false'
+
+# Cleanup extra sessions
+ab3 close 2>/dev/null||true; ab4 close 2>/dev/null||true
 
 # ══════════════════════════════════════════════════════════════════════════════
 echo ""

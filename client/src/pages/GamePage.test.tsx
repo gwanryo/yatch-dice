@@ -234,13 +234,13 @@ describe('GamePage layout — dice tray must not be clipped', () => {
     expect(middleArea.className).toContain('min-h-0');
   });
 
-  it('scoreboard container has max-h-[70vh] on mobile to leave room for tray', () => {
+  it('scoreboard container should not have overflow-y-auto (prevents double scrollbar)', () => {
     const { container } = render(
       <GamePage state={baseState} dispatch={vi.fn()} send={vi.fn()} playerId="me" />,
     );
     const scoreboardWrapper = container.querySelector('[data-testid="scoreboard"]')?.parentElement;
     expect(scoreboardWrapper).toBeTruthy();
-    expect(scoreboardWrapper!.className).toContain('max-h-[70vh]');
+    expect(scoreboardWrapper!.className).not.toContain('overflow-y-auto');
   });
 });
 

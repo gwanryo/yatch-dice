@@ -57,7 +57,10 @@
     "fours": "Fours", "fives": "Fives", "sixes": "Sixes",
     "choice": "Choice", "fourOfAKind": "Four of a Kind", "fullHouse": "Full House",
     "smallStraight": "Sm. Straight", "largeStraight": "Lg. Straight", "yacht": "Yacht",
-    "upperBonus": "Upper Bonus", "total": "Total"
+    "upperBonus": "Upper Bonus", "total": "Total",
+    "choice_short": "C", "fourOfAKind_short": "Fk", "fullHouse_short": "F.H",
+    "smallStraight_short": "S.S", "largeStraight_short": "L.S", "yacht_short": "Yt",
+    "upperBonus_short": "Bn", "total_short": "Tot"
   },
   "result": {
     "title": "Game Results",
